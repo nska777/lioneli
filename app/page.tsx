@@ -1,65 +1,78 @@
-import Image from "next/image";
+// app/page.tsx
+import GSAPHeroSlider from "./components/home/GSAPHeroSlider";
+import BestSellers from "./components/home/BestSellers";
+import BestPrice from "./components/home/BestPrice";
+import AboutCompany from "./components/home/AboutCompany";
+import CollectionsSlider from "./components/home/CollectionsSlider";
+
+// ✅ секция поставок/новостей
+import SupplyNewsSection from "./components/home/SupplyNewsSection";
+import { supplyNewsMock } from "./mocks/supplyNews";
+import NewsletterCta from "./components/home/NewsletterCta";
+
+const demoCollections = [
+  {
+    id: "1",
+    title: "Спальня Salvador — идеальная классика",
+    description:
+      "Премиальная коллекция «SALVADOR», выполненная в неоклассическом стиле — это исключительное качество и элегантность, представленное в таких трендовых цветовых решениях, как: «Белый», «Пепельная Роза» и «Кашемир».\n\nПремиальная коллекция «SALVADOR», выполненная в неоклассическом стиле — это исключительное качество и элегантность, представленное в таких трендовых цветовых решениях, как: «Белый», «Пепельная Роза» и «Кашемир».",
+    images: [
+      { url: "/images/home/collections/1.jpg" },
+      { url: "/images/home/collections/2.jpg" },
+      { url: "/images/home/collections/3.jpg" },
+    ],
+  },
+  {
+    id: "2",
+    title: "​Amber — свет и воздух",
+    description:
+      "AMBER — коллекция, выполненная в стилеконтемпорари — это элегантный ифункциональный дизайн, сочетающий в себесовременные тенденции и высокое качествоматериаловAMBER — это коллекция, в которой каждая детальтщательно продумана, чтобы обеспечитьоптимальный комфорт и удобство использования.AMBER — это широкий модульный ряд, благодарякоторому в едином стиле можно обставитьквартиру и даже целый дом!Цветовая палитра коллекции включает в себянейтральные оттенки, которые позволяют легкосочетать мебель с самыми разными стилями винтерьере, а комбинирование различныхматериалов и текстур придает ей особый шармСтильные деревянные акценты создают контраст иделают мебель по-настоящему уникальной!",
+    images: [
+      { url: "/images/home/collections/4.jpg" },
+      { url: "/images/home/collections/5.jpg" },
+      { url: "/images/home/collections/6.jpg" },
+    ],
+  },
+  {
+    id: "3",
+    title: "Pitti",
+    description:
+      "Коллекция мебели «Pitti» была названа в честь самогобольшого дворца (палаццо) во Флоренции. Сам дворецявляется выдающимся памятником архитектуры XV века(период Раннего Возрождения). Строительство этогострогого здания было начато в 1458 году флорентийскимбанкиром Лукой Питти, главным сторонником и близкимдругом Козимо Медичи. Что же в коллекции «Pitti» говорит о легендарномфлорентийском стиле? - использование натуральных материалов (массив ясеня); - изящные и плавные линии (высокие и точенныеножкитуалетного столика) - характерные декоративные элементы (опоры,выполненные в форме «луковиц»); - низкие кровати со сложной конструкцией изголовья; - использование в обивки мебели (изголовье кровати)дорогих тканей благородного оттенка; - темная цветовая гамма.Но и это еще не все… ",
+    images: [
+      { url: "/images/home/collections/7.jpg" },
+      { url: "/images/home/collections/8.jpg" },
+      { url: "/images/home/collections/9.jpg" },
+    ],
+  },
+  {
+    id: "4",
+    title: "​SCANDY",
+    description:
+      "В коллекции SCANDY, выполненной вскандинавском стиле, все лаконично исдержанно, все гармонично и натурально. А ещеSCANDY — это добротность, функциональностьи комфорт — все то, что так ценят современныепокупатели. — В дизайне данной коллекции творческипереработаны правила популярной жизненнойфилософии LAGOM — и все с учетом запросовроссийских потребителей. — Коллекция включает в себя 54 изделия дляоформления: спальни, молодежной комнаты,гардеробной, гостиной, рабочего кабинета,библиотеки и прихожей.",
+    images: [
+      { url: "/images/home/collections/10.jpg" },
+      { url: "/images/home/collections/11.jpg" },
+      { url: "/images/home/collections/12.jpg" },
+    ],
+  },
+];
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <main>
+      <GSAPHeroSlider />
+      <BestSellers />
+      <BestPrice />
+      <AboutCompany />
+
+      <CollectionsSlider
+        collections={demoCollections}
+        autoplayMs={7500}
+        imageAutoplayMs={2600}
+      />
+
+      <SupplyNewsSection items={supplyNewsMock} />
+      <NewsletterCta backgroundUrl="/images/home/newsletter-bg.jpg" />
+    </main>
   );
 }
