@@ -1,4 +1,5 @@
 // lib/mock/products.ts
+
 export type PriceByRegion = { uzs: number; rub: number };
 
 export type Product = {
