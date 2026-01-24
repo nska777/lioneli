@@ -13,6 +13,8 @@ type ProfileRow = {
   phone_verified: boolean;
 };
 
+const LS_CHECKOUT_PROFILE = "lioneto:checkout:profile:v1";
+
 export default function AccountProfile({
   userId,
   email,
@@ -31,9 +33,32 @@ export default function AccountProfile({
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // ✅ синхроним имя в инпуте
   useEffect(() => {
     setName(profile?.full_name ?? "");
   }, [profile?.full_name]);
+
+  // ✅ КЛЮЧ: когда профиль/почта загрузились — сохраняем в localStorage для checkout
+  useEffect(() => {
+    try {
+      if (!profile) return;
+
+      const raw = localStorage.getItem(LS_CHECKOUT_PROFILE);
+      const prev = raw ? (JSON.parse(raw) as any) : {};
+
+      // address пока негде взять — оставляем как было (если юзер уже вводил)
+      const next = {
+        ...prev,
+        name: profile.full_name ?? prev?.name ?? "",
+        phone: profile.phone_e164 ?? prev?.phone ?? "",
+        address: prev?.address ?? "",
+        email: email ?? prev?.email ?? "",
+        updatedAt: Date.now(),
+      };
+
+      localStorage.setItem(LS_CHECKOUT_PROFILE, JSON.stringify(next));
+    } catch {}
+  }, [profile?.full_name, profile?.phone_e164, email, profile]);
 
   async function save() {
     setMsg(null);
@@ -52,7 +77,24 @@ export default function AccountProfile({
       return;
     }
 
+    // ✅ обновили стейт родителя
     onProfile(data as any);
+
+    // ✅ и сразу обновили localStorage (чтобы checkout подхватил)
+    try {
+      const raw = localStorage.getItem(LS_CHECKOUT_PROFILE);
+      const prev = raw ? (JSON.parse(raw) as any) : {};
+      const next = {
+        ...prev,
+        name: (data as any)?.full_name ?? prev?.name ?? "",
+        phone: (data as any)?.phone_e164 ?? prev?.phone ?? "",
+        address: prev?.address ?? "",
+        email: email ?? prev?.email ?? "",
+        updatedAt: Date.now(),
+      };
+      localStorage.setItem(LS_CHECKOUT_PROFILE, JSON.stringify(next));
+    } catch {}
+
     setMsg({ ok: true, text: "Сохранено." });
     setSaving(false);
     setEditing(false);

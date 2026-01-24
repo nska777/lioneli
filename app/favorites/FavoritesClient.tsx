@@ -144,8 +144,9 @@ export default function FavoritesClient() {
                 className="rounded-3xl border border-black/10 bg-white p-4 md:p-5"
               >
                 <div className="flex gap-4">
+                  {/* ✅ было /catalog?product=... -> стало /product/{id} */}
                   <Link
-                    href={`/catalog?product=${it.product.id}`}
+                    href={`/product/${it.product.id}`}
                     className="cursor-pointer relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-black/5"
                   >
                     <SafeImage src={it.product.image} alt={it.product.title} />
@@ -154,8 +155,9 @@ export default function FavoritesClient() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
+                        {/* ✅ было /catalog?product=... -> стало /product/{id} */}
                         <Link
-                          href={`/catalog?product=${it.product.id}`}
+                          href={`/product/${it.product.id}`}
                           className="cursor-pointer block truncate text-base font-medium tracking-[-0.01em] hover:underline"
                         >
                           {it.product.title}
@@ -186,8 +188,9 @@ export default function FavoritesClient() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-3">
+                      {/* ✅ было /catalog?product=... -> стало /product/{id} */}
                       <Link
-                        href={`/catalog?product=${it.product.id}`}
+                        href={`/product/${it.product.id}`}
                         className="cursor-pointer inline-flex items-center justify-center rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black/75 hover:text-black hover:border-black/20 transition"
                       >
                         Смотреть
@@ -196,7 +199,6 @@ export default function FavoritesClient() {
                       <button
                         type="button"
                         onClick={() => {
-                          // ✅ единая логика корзины
                           shop.toggleCart(it.id);
                           window.location.href = "/cart";
                         }}
@@ -224,15 +226,13 @@ export default function FavoritesClient() {
           <div className="text-base font-semibold tracking-[-0.01em]">
             Рекомендуем
           </div>
-          <p className="mt-1 text-sm text-black/55">
-            То, что часто берут вместе.
-          </p>
+          <p className="mt-1 text-sm text-black/55">Товары высокого спроса</p>
 
           <div className="mt-4 space-y-3">
             {recommended.map((p) => (
               <Link
                 key={p.id}
-                href={`/catalog?product=${p.id}`}
+                href={`/product/${p.id}`} // ✅ было /catalog?product=... -> стало /product/{id}
                 className="group flex items-center gap-3 rounded-2xl border border-black/10 bg-white p-3 hover:border-black/20 transition cursor-pointer"
               >
                 <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-black/5 shrink-0">
@@ -262,9 +262,7 @@ export default function FavoritesClient() {
             </Link>
           </div>
 
-          <p className="mt-4 text-xs leading-relaxed text-black/45">
-            * Рекомендации пока на моках. Позже подключим Strapi и будет умнее.
-          </p>
+          <p className="mt-4 text-xs leading-relaxed text-black/45"></p>
         </aside>
       </div>
     </main>

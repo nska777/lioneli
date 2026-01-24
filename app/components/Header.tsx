@@ -66,9 +66,26 @@ export default function Header() {
         regionLabel={REGION_DATA[region].label}
         phonePrefix={phonePrefix}
         regionKey={region}
-        onSubmit={(data) => {
-          // пока просто заглушка, потом подключим отправку
-          console.log("CALL REQUEST:", data);
+        onSubmit={async (data) => {
+          try {
+            const res = await fetch("/api/call-request", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...data, // { lastName, firstName, phone }
+                region: REGION_DATA[region].label,
+                pageUrl:
+                  typeof window !== "undefined" ? window.location.href : "",
+              }),
+            });
+
+            if (!res.ok) {
+              const text = await res.text();
+              console.error("CALL REQUEST FAILED:", text);
+            }
+          } catch (err) {
+            console.error("CALL REQUEST ERROR:", err);
+          }
         }}
       />
 

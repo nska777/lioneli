@@ -33,9 +33,10 @@ function TopLink({
     const line = lineRef.current;
     if (!root || !line) return;
 
-    // если активный — линия сразу видна
+    // старт
     gsap.set(line, {
       scaleX: active ? 1 : 0,
+      opacity: active ? 1 : 0,
       transformOrigin: "left center",
     });
 
@@ -43,19 +44,21 @@ function TopLink({
       gsap.killTweensOf(line);
       gsap.to(line, {
         scaleX: 1,
+        opacity: 1,
         duration: 0.35,
-        ease: "power2.out",
+        ease: "power3.out",
         transformOrigin: "left center",
       });
     };
 
     const onLeave = () => {
-      if (active) return; // 🔑 не убираем underline у активного пункта
+      if (active) return;
       gsap.killTweensOf(line);
       gsap.to(line, {
         scaleX: 0,
+        opacity: 0,
         duration: 0.25,
-        ease: "power2.in",
+        ease: "power3.inOut",
         transformOrigin: "right center",
       });
     };
@@ -74,8 +77,9 @@ function TopLink({
       ref={rootRef}
       href={href}
       className={cn(
-        "relative cursor-pointer select-none transition",
-        active ? "text-black" : "text-black/75 hover:text-black",
+        "relative cursor-pointer select-none transition-colors",
+        "text-[13px] tracking-[0.02em]",
+        active ? "text-black" : "text-black/70 hover:text-black",
       )}
     >
       {children}
@@ -84,10 +88,12 @@ function TopLink({
       <span
         ref={lineRef}
         aria-hidden
-        className="absolute -bottom-[6px] left-0 h-[1px] w-full"
+        className={cn(
+          "pointer-events-none absolute left-0 -bottom-[0.75px] w-full rounded-full",
+          active ? "h-[0.75px]" : "h-[0.75px]",
+        )}
         style={{
-          background:
-            "linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,0.55), rgba(0,0,0,0))",
+          background: "rgba(0,0,0,0.65)",
         }}
       />
     </Link>

@@ -1,3 +1,4 @@
+// app/context/shop-state.tsx
 "use client";
 
 import React, {
@@ -10,7 +11,7 @@ import React, {
 
 type CartMap = Record<string, number>; // id -> qty
 
-type ShopState = {
+export type ShopState = {
   favorites: string[];
   isFav: (id: string) => boolean;
   toggleFav: (id: string) => void;
@@ -30,6 +31,9 @@ type ShopState = {
   // ✅ добавили для страницы /cart
   setCartQty: (id: string, qty: number) => void;
   clearCart: () => void;
+
+  // ✅ one-click: оставить в корзине только этот товар
+  setCartOnly: (id: string, qty?: number) => void;
 };
 
 const Ctx = createContext<ShopState | null>(null);
@@ -80,7 +84,8 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
 
     // базовое добавление qty (страница корзины пригодится)
     const addToCart = (id: string, qty = 1) => {
-      setCart((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + qty }));
+      const q = Math.max(1, Math.floor(qty || 1));
+      setCart((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + q }));
     };
 
     const removeFromCart = (id: string) => {
@@ -120,6 +125,12 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
     // ✅ clear для /cart
     const clearCart = () => setCart({});
 
+    // ✅ one-click: оставить только один товар
+    const setCartOnly = (id: string, qty = 1) => {
+      const q = Math.max(1, Math.floor(qty || 1));
+      setCart({ [id]: q });
+    };
+
     const favCount = favorites.length;
     const cartCount = Object.values(cart).reduce((a, b) => a + (b || 0), 0);
 
@@ -139,6 +150,8 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
 
       setCartQty,
       clearCart,
+
+      setCartOnly,
     };
   }, [favorites, cart]);
 

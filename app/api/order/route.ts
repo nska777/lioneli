@@ -24,24 +24,40 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Bad JSON" }, { status: 400 });
   }
 
-  const { orderId, createdAt, region, customer, items, total } = body || {};
-  if (!orderId || !customer?.phone || !Array.isArray(items) || items.length === 0) {
-    return NextResponse.json({ ok: false, error: "Invalid payload" }, { status: 400 });
+  const { orderId, createdAt, region, mode, customer, items, total } = body || {};
+  if (
+    !orderId ||
+    !customer?.phone ||
+    !Array.isArray(items) ||
+    items.length === 0
+  ) {
+    return NextResponse.json(
+      { ok: false, error: "Invalid payload" },
+      { status: 400 },
+    );
   }
 
   const currency = region === "uz" ? "сум" : "₽";
+  const kind = mode === "oneclick" ? "⚡️ ONE-CLICK" : "🛒 CART";
+
   const lines = items
-    .map((it: any, i: number) => `${i + 1}) ${it.title} — ${it.qty} × ${it.unit} = ${it.sum} ${currency}`)
+    .map(
+      (it: any, i: number) =>
+        `${i + 1}) ${it.title} — ${it.qty} × ${it.unit} = ${it.sum} ${currency}`,
+    )
     .join("\n");
 
   const text =
     `🧾 <b>НОВЫЙ ЗАКАЗ</b>\n` +
+    `${esc(kind)}\n` +
     `🆔 <b>${esc(orderId)}</b>\n` +
     `🕒 ${esc(createdAt)}\n\n` +
     `📞 <b>Телефон:</b> ${esc(customer.phone)}\n` +
     `${customer.name ? `👤 <b>Имя:</b> ${esc(customer.name)}\n` : ""}` +
     `${customer.address ? `📍 <b>Адрес:</b> ${esc(customer.address)}\n` : ""}` +
-    `${customer.comment ? `💬 <b>Комментарий:</b> ${esc(customer.comment)}\n` : ""}` +
+    `${
+      customer.comment ? `💬 <b>Комментарий:</b> ${esc(customer.comment)}\n` : ""
+    }` +
     `\n<b>Заказ:</b>\n${esc(lines)}\n\n` +
     `💰 <b>Итого:</b> ${esc(String(total))} ${currency}`;
 

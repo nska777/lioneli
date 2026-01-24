@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 import { useRegionLang } from "../context/region-lang";
 import { useShopState } from "../context/shop-state";
 import { byId } from "../lib/mock/products";
+
+// ✅ подтягиваем профиль как в кабинете
+import { supabase } from "@/app/lib/supabase/client";
 
 function formatMoney(n: number, region: "uz" | "ru") {
   if (region === "uz") return new Intl.NumberFormat("ru-RU").format(n) + " сум";
@@ -22,7 +26,35 @@ function makeOrderId() {
   return `LNT-${y}${m}${day}-${rand}`;
 }
 
+const LS_CUSTOMER = "lioneto:customer:v1";
+const LS_ONECLICK = "lioneto:oneclick:v1";
+
+type CustomerCache = {
+  phone?: string;
+  name?: string;
+  address?: string;
+  comment?: string;
+};
+
+type ProfileRow = {
+  full_name: string | null;
+  phone_e164: string | null;
+  phone_verified: boolean;
+};
+
+function safeParse<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function CheckoutClient() {
+  const sp = useSearchParams();
+  const mode = sp.get("mode"); // "oneclick" | null
+
   const { region } = useRegionLang();
   const shop = useShopState() as any;
 
@@ -37,20 +69,101 @@ export default function CheckoutClient() {
   const [doneOrderId, setDoneOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // ✅ 1) подтягиваем customer cache (адрес/коммент/телефон/имя если вводили)
+  useEffect(() => {
+    const c = safeParse<CustomerCache>(localStorage.getItem(LS_CUSTOMER), {});
+    if (c.phone) setPhone(c.phone);
+    if (c.name) setName(c.name);
+    if (c.address) setAddress(c.address);
+    if (c.comment) setComment(c.comment);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ✅ 2) подтягиваем профиль из supabase и ДОЗАПОЛНЯЕМ (как ты и хотел)
+  useEffect(() => {
+    let alive = true;
+
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getSession();
+        const userId = data.session?.user?.id;
+        if (!userId) return;
+
+        const { data: prof } = await supabase
+          .from("profiles")
+          .select("full_name, phone_e164, phone_verified")
+          .eq("user_id", userId)
+          .single();
+
+        if (!alive) return;
+
+        const p = prof as ProfileRow | null;
+        if (p?.full_name && !name) setName(p.full_name);
+        if (p?.phone_e164 && (!phone || phone.trim().length < 5)) {
+          setPhone(p.phone_e164);
+        }
+      } catch {
+        // молча
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ===== items source =====
+
   // cart: Record<string, number>
   const cart = shop?.cart ?? {};
-  const ids = useMemo(
+  const cartIds = useMemo(
     () => Object.keys(cart).filter((id) => (cart[id] ?? 0) > 0),
     [cart],
   );
 
+  // oneClick from state OR localStorage
+  const oneClick = shop?.oneClick ?? null;
+
+  const oneClickFromLS = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    const oc = safeParse<{ id: string; qty: number } | null>(
+      localStorage.getItem(LS_ONECLICK),
+      null,
+    );
+    if (!oc?.id) return null;
+    return { id: String(oc.id), qty: Math.max(1, Math.floor(oc.qty || 1)) };
+  }, []);
+
+  const effectiveOneClick = oneClick?.id
+    ? oneClick
+    : oneClickFromLS?.id
+      ? oneClickFromLS
+      : null;
+
   const items = useMemo(() => {
+    const useOneClick = mode === "oneclick";
+
+    const ids = useOneClick
+      ? effectiveOneClick?.id
+        ? [effectiveOneClick.id]
+        : []
+      : cartIds;
+
     return ids
       .map((id) => {
         const p = byId.get(id);
-        if (!p) return null; // если моки не совпали — не ломаем страницу
-        const qty = cart[id] ?? 1;
-        const unit = region === "uz" ? p.price.uzs : p.price.rub;
+        if (!p) return null;
+
+        const qty = useOneClick
+          ? (effectiveOneClick?.qty ?? 1)
+          : (cart[id] ?? 1);
+
+        const unit =
+          region === "uz"
+            ? ((p as any).price?.uzs ?? (p as any).price_uzs)
+            : ((p as any).price?.rub ?? (p as any).price_rub);
+
         return {
           id,
           title: p.title,
@@ -66,7 +179,7 @@ export default function CheckoutClient() {
       unit: number;
       sum: number;
     }>;
-  }, [ids, cart, region]);
+  }, [mode, effectiveOneClick, cartIds, cart, region]);
 
   const total = useMemo(() => items.reduce((a, b) => a + b.sum, 0), [items]);
 
@@ -80,6 +193,15 @@ export default function CheckoutClient() {
     setSubmitting(true);
 
     try {
+      // ✅ сохраняем customer cache (чтобы адрес/коммент подтягивались всегда)
+      const cache: CustomerCache = {
+        phone: phone.trim(),
+        name: name.trim(),
+        address: address.trim(),
+        comment: comment.trim(),
+      };
+      localStorage.setItem(LS_CUSTOMER, JSON.stringify(cache));
+
       const payload = {
         orderId,
         createdAt: new Date().toLocaleString("ru-RU"),
@@ -107,8 +229,12 @@ export default function CheckoutClient() {
 
       setDoneOrderId(orderId);
 
-      // очистка корзины (если метод есть)
-      if (typeof shop?.clearCart === "function") shop.clearCart();
+      // ✅ если это oneclick — чистим oneClick, если обычная корзина — чистим cart
+      if (mode === "oneclick" && typeof shop?.clearOneClick === "function") {
+        shop.clearOneClick();
+      } else if (typeof shop?.clearCart === "function") {
+        shop.clearCart();
+      }
     } catch (e: any) {
       setError(e?.message || "Ошибка");
     } finally {
@@ -255,7 +381,7 @@ export default function CheckoutClient() {
                 </div>
               ))
             ) : (
-              <div className="text-sm text-black/55">Корзина пустая</div>
+              <div className="text-sm text-black/55">Товар не выбран</div>
             )}
           </div>
 

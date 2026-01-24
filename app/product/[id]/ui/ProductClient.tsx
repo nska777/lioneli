@@ -1,20 +1,26 @@
+// ProductClient.tsx (обновлённый) — ЛОГИКУ КОРЗИНЫ/1-КЛИК НЕ ТРОГАЮ.
+// Добавил: 1) стрелки на главном фото (prev/next) 2) открытие в полный размер (lightbox) + листание.
+
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ChevronLeft,
-  ChevronRight,
   Heart,
   ShoppingCart,
+  Minus,
+  Plus,
+  Check,
   X,
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
 } from "lucide-react";
 
 import { useRegionLang } from "@/app/context/region-lang";
 import { useShopState } from "@/app/context/shop-state";
-import { CATALOG_MOCK } from "@/app/lib/mock/catalog-products";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -34,99 +40,44 @@ function formatPrice(value: number, currency: "RUB" | "UZS") {
   }
 }
 
-type Product = {
+type ProductPageModel = {
   id: string;
   title: string;
   badge?: string;
-  href?: string;
   sku?: string;
   image: string;
   gallery: string[];
   price_rub: number;
   price_uzs: number;
   description?: string;
-  specs?: Array<{ label: string; value: string }>;
-  variants?: Array<{ label: string; swatch: string; id?: string }>;
+  extra?: {
+    article?: string;
+    size?: string;
+    color?: string;
+    material?: string;
+  };
+  related?: Array<{
+    id: string;
+    title: string;
+    image: string;
+    price_rub: number;
+    price_uzs: number;
+    href: string;
+    badge?: string;
+  }>;
 };
 
-function IconPill({
-  active,
-  onClick,
-  icon,
-  label,
-  tone = "neutral",
+export default function ProductClient({
+  product,
 }: {
-  active?: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-  tone?: "neutral" | "danger" | "success";
+  product: ProductPageModel;
 }) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] transition",
-        "bg-white/85 backdrop-blur-xl border-black/10 hover:border-black/20",
-        tone === "danger" && active && "text-rose-600",
-        tone === "success" && active && "text-emerald-600",
-        !active && "text-black/75",
-        active && tone === "neutral" && "text-black",
-      )}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function ArrowBtn({
-  dir,
-  disabled,
-  onClick,
-  className,
-}: {
-  dir: "left" | "right";
-  disabled?: boolean;
-  onClick: () => void;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={dir === "left" ? "Назад" : "Вперёд"}
-      className={cn(
-        "cursor-pointer absolute top-1/2 -translate-y-1/2 z-10",
-        "h-10 w-10 rounded-full grid place-items-center",
-        "bg-white/85 backdrop-blur-xl border border-black/10",
-        "shadow-[0_14px_40px_rgba(0,0,0,0.16)] transition",
-        disabled
-          ? "opacity-40 cursor-default"
-          : "hover:bg-white hover:border-black/20",
-        dir === "left" ? "left-3" : "right-3",
-        className,
-      )}
-    >
-      {dir === "left" ? (
-        <ChevronLeft className="h-5 w-5 text-black/70" />
-      ) : (
-        <ChevronRight className="h-5 w-5 text-black/70" />
-      )}
-    </button>
-  );
-}
-
-export default function ProductClient({ product }: { product: Product }) {
   const router = useRouter();
   const { region } = useRegionLang();
   const currency: "RUB" | "UZS" = region === "ru" ? "RUB" : "UZS";
 
-  const { isFav, toggleFav, isInCart, toggleCart } = useShopState();
-
-  const fav = isFav(product.id);
-  const inCart = isInCart(product.id);
+  const { isFav, toggleFav, isInCart, addToCart, removeFromCart, setCartOnly } =
+    useShopState();
 
   const gallery = useMemo(() => {
     const g = Array.isArray(product.gallery)
@@ -136,447 +87,446 @@ export default function ProductClient({ product }: { product: Product }) {
   }, [product.gallery, product.image]);
 
   const [activeIdx, setActiveIdx] = useState(0);
+  const [qty, setQty] = useState(1);
+
+  // lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIdx, setLightboxIdx] = useState(0);
 
-  // выбранный цвет (визуально)
-  const variants = product.variants ?? [];
-  const [variantIdx, setVariantIdx] = useState(0);
+  const fav = isFav(product.id);
+  const inCart = isInCart(product.id);
 
-  // добавляем Width/Height в характеристики, если их нет
-  const specs = useMemo(() => {
-    const base = Array.isArray(product.specs) ? [...product.specs] : [];
-    const hasW = base.some((s) => s.label.toLowerCase().includes("шир"));
-    const hasH = base.some((s) => s.label.toLowerCase().includes("выс"));
-    if (!hasW) base.push({ label: "Ширина", value: "—" });
-    if (!hasH) base.push({ label: "Высота", value: "—" });
-    return base;
-  }, [product.specs]);
+  const unitPrice = currency === "RUB" ? product.price_rub : product.price_uzs;
+  const totalPrice = unitPrice * qty;
 
-  const value = currency === "RUB" ? product.price_rub : product.price_uzs;
+  const toggleMainCart = () => {
+    if (inCart) removeFromCart(product.id);
+    else addToCart(product.id, qty);
+  };
 
-  // стрелки
-  const canPrev = activeIdx > 0;
-  const canNext = activeIdx < gallery.length - 1;
+  const maxLen = Math.max(1, gallery.length);
 
-  const prev = () => setActiveIdx((i) => Math.max(0, i - 1));
-  const next = () => setActiveIdx((i) => Math.min(gallery.length - 1, i + 1));
+  const nextMain = () => setActiveIdx((v) => (v + 1) % maxLen);
+  const prevMain = () => setActiveIdx((v) => (v - 1 + maxLen) % maxLen);
 
-  // клавиши (в лайтбоксе)
+  const openLightbox = (idx: number) => {
+    setLightboxIdx(idx);
+    setLightboxOpen(true);
+  };
+
+  const nextLb = () => setLightboxIdx((v) => (v + 1) % maxLen);
+  const prevLb = () => setLightboxIdx((v) => (v - 1 + maxLen) % maxLen);
+
+  // esc закрывает, стрелки листают
   useEffect(() => {
     if (!lightboxOpen) return;
-
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setLightboxOpen(false);
-      if (e.key === "ArrowLeft") setActiveIdx((i) => Math.max(0, i - 1));
-      if (e.key === "ArrowRight")
-        setActiveIdx((i) => Math.min(gallery.length - 1, i + 1));
+      if (e.key === "ArrowRight") nextLb();
+      if (e.key === "ArrowLeft") prevLb();
     };
-
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxOpen, gallery.length]);
-
-  // “Что покупают с этим товаром” — 2 карточки (предпочтительно хиты)
-  const related = useMemo(() => {
-    const all = (CATALOG_MOCK ?? []) as any[];
-    const isHit = (p: any) => {
-      const b = String(p.badge || "").toLowerCase();
-      return b.includes("хит") || b.includes("bestseller");
-    };
-
-    const pool = all.filter((p) => String(p.id) !== String(product.id));
-    const hits = pool.filter(isHit);
-    const pick = (hits.length ? hits : pool).slice(0, 2);
-
-    return pick.map((p) => ({
-      id: String(p.id),
-      title: p.title,
-      image: p.image,
-      badge: isHit(p) ? "Хит продаж" : "",
-      price_rub: Number(p.price_rub ?? 0),
-      price_uzs: Number(p.price_uzs ?? 0),
-      href: `/product/${p.id}`,
-    }));
-  }, [product.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxOpen, maxLen]);
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8">
-      {/* top bar */}
-      <div className="mb-5 flex items-center justify-between gap-3">
+      {/* breadcrumbs */}
+      <div className="mb-4 text-[12px] text-black/40">
+        <Link href="/" className="hover:text-black/70">
+          Главная
+        </Link>{" "}
+        /{" "}
+        <Link href="/catalog" className="hover:text-black/70">
+          Каталог
+        </Link>{" "}
+        / <span className="text-black/60">{product.title}</span>
+      </div>
+
+      {/* top row */}
+      <div className="mb-5 flex items-center justify-between">
         <button
           onClick={() => router.push("/catalog")}
           className={cn(
-            "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[12px] tracking-[0.16em] uppercase transition",
-            "border-black/10 bg-white hover:border-black/20 text-black/70 hover:text-black",
+            "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2",
+            "border-black/10 bg-white text-[12px] tracking-[0.16em] uppercase text-black/70",
+            "hover:border-black/20 hover:text-black transition",
           )}
         >
-          <ChevronLeft className="h-4 w-4" />
-          Назад
+          ← НАЗАД
         </button>
 
         <div className="flex items-center gap-2">
-          <IconPill
-            tone="danger"
-            active={fav}
+          <button
             onClick={() => toggleFav(product.id)}
-            icon={<Heart className={cn("h-4 w-4", fav && "fill-current")} />}
-            label="В избранное"
-          />
-          <IconPill
-            tone="success"
-            active={inCart}
-            onClick={() => toggleCart(product.id)}
-            icon={
-              <ShoppingCart
-                className={cn("h-4 w-4", inCart && "fill-current")}
-              />
-            }
-            label={inCart ? "В корзине" : "В корзину"}
-          />
+            className={cn(
+              "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2",
+              "border-black/10 bg-white text-[13px] text-black/75 hover:border-black/20 hover:text-black transition",
+            )}
+          >
+            <Heart
+              className={cn("h-4 w-4", fav && "fill-current text-rose-600")}
+            />
+            В избранное
+          </button>
+
+          {/* верхняя кнопка корзины НЕ меняется на "Добавлено" */}
+          <button
+            onClick={toggleMainCart}
+            className={cn(
+              "cursor-pointer inline-flex items-center gap-2 rounded-full px-4 py-2",
+              "text-[13px] text-white transition bg-black hover:bg-black/90",
+            )}
+          >
+            <ShoppingCart className="h-4 w-4" />
+            {inCart ? "В корзине" : "В корзину"}
+          </button>
         </div>
       </div>
 
-      {/* main grid */}
-      <div className="grid gap-8 lg:grid-cols-[1.25fr_1fr]">
-        {/* left: gallery */}
+      <div className="grid gap-10 lg:grid-cols-[520px_1fr]">
+        {/* LEFT */}
         <section>
-          <div className="relative overflow-hidden rounded-[28px] border border-black/10 bg-black/[0.02]">
-            {product.badge ? (
-              <div className="absolute left-4 top-4 z-10">
-                <span
-                  className={cn(
-                    "inline-flex items-center h-7 px-3 rounded-[12px]",
-                    "bg-white/88 backdrop-blur-xl",
-                    "border border-amber-400/70",
-                    "text-[12px] font-medium text-amber-700",
-                    "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
-                  )}
-                >
-                  {product.badge}
-                </span>
-              </div>
-            ) : null}
-
-            <ArrowBtn dir="left" disabled={!canPrev} onClick={prev} />
-            <ArrowBtn dir="right" disabled={!canNext} onClick={next} />
-
+          <div className="relative aspect-square overflow-hidden rounded-3xl bg-black/[0.03]">
+            {/* click = open full */}
             <button
               type="button"
-              onClick={() => setLightboxOpen(true)}
-              className="cursor-pointer relative block w-full aspect-[16/10]"
-              aria-label="Открыть фото в полном размере"
+              onClick={() => openLightbox(activeIdx)}
+              className="absolute inset-0 cursor-zoom-in"
+              aria-label="Открыть фото в полный размер"
+            />
+
+            <Image
+              src={gallery[activeIdx]}
+              alt={product.title}
+              fill
+              priority
+              className="object-contain"
+              sizes="(max-width: 1024px) 100vw, 520px"
+            />
+
+            {/* стрелки на главном фото */}
+            {gallery.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    prevMain();
+                  }}
+                  className={cn(
+                    "absolute left-3 top-1/2 -translate-y-1/2 z-10",
+                    "h-11 w-11 rounded-full bg-white/90 border border-black/10",
+                    "grid place-items-center shadow-[0_10px_30px_rgba(0,0,0,0.10)]",
+                    "hover:bg-white transition cursor-pointer",
+                  )}
+                  aria-label="Предыдущее фото"
+                >
+                  <ChevronLeft className="h-5 w-5 text-black/70" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    nextMain();
+                  }}
+                  className={cn(
+                    "absolute right-3 top-1/2 -translate-y-1/2 z-10",
+                    "h-11 w-11 rounded-full bg-white/90 border border-black/10",
+                    "grid place-items-center shadow-[0_10px_30px_rgba(0,0,0,0.10)]",
+                    "hover:bg-white transition cursor-pointer",
+                  )}
+                  aria-label="Следующее фото"
+                >
+                  <ChevronRight className="h-5 w-5 text-black/70" />
+                </button>
+              </>
+            )}
+
+            {/* иконка "full" */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openLightbox(activeIdx);
+              }}
+              className={cn(
+                "absolute right-3 bottom-3 z-10",
+                "h-10 w-10 rounded-full bg-white/90 border border-black/10",
+                "grid place-items-center shadow-[0_10px_30px_rgba(0,0,0,0.10)]",
+                "hover:bg-white transition cursor-pointer",
+              )}
+              aria-label="Открыть в полный размер"
             >
-              <Image
-                src={gallery[activeIdx]}
-                alt={product.title}
-                fill
-                priority
-                className="object-cover"
-                sizes="(max-width: 1024px) 100vw, 55vw"
-              />
-              <div
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(180deg, rgba(0,0,0,0.10) 0%, rgba(0,0,0,0.00) 40%, rgba(0,0,0,0.08) 100%)",
-                }}
-              />
+              <Maximize2 className="h-4 w-4 text-black/70" />
             </button>
           </div>
 
-          {/* thumbs */}
-          <div className="mt-4">
-            <div className="flex items-center justify-between">
-              <div className="text-[12px] text-black/50">
-                Нажми на фото, чтобы открыть в полном размере
-              </div>
-              <div className="text-[12px] text-black/40">
-                {activeIdx + 1}/{gallery.length}
-              </div>
-            </div>
-
-            <div className="mt-3 grid grid-cols-3 gap-3">
-              {gallery.slice(0, 3).map((src, i) => {
-                const idx = i; // первые 3
-                const active = idx === activeIdx;
-                return (
-                  <button
-                    key={`${src}-${i}`}
-                    type="button"
-                    onClick={() => setActiveIdx(idx)}
-                    className={cn(
-                      "cursor-pointer relative overflow-hidden rounded-2xl border bg-white",
-                      active
-                        ? "border-black/30"
-                        : "border-black/10 hover:border-black/20",
-                    )}
-                    style={{ aspectRatio: "16/10" }}
-                    aria-label={`Открыть фото ${i + 1}`}
-                  >
-                    <Image
-                      src={src}
-                      alt={`${product.title} ${i + 1}`}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 1024px) 33vw, 220px"
-                    />
-                  </button>
-                );
-              })}
-            </div>
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {gallery.slice(0, 4).map((src, i) => {
+              const active = i === activeIdx;
+              return (
+                <button
+                  key={`${src}-${i}`}
+                  type="button"
+                  onClick={() => setActiveIdx(i)}
+                  className={cn(
+                    "cursor-pointer relative aspect-square overflow-hidden rounded-2xl bg-black/[0.03] transition",
+                    active
+                      ? "ring-2 ring-black/20"
+                      : "hover:ring-2 hover:ring-black/10",
+                  )}
+                  aria-label={`Фото ${i + 1}`}
+                >
+                  <Image
+                    src={src}
+                    alt={`${product.title} ${i + 1}`}
+                    fill
+                    className="object-contain"
+                    sizes="120px"
+                  />
+                </button>
+              );
+            })}
           </div>
         </section>
 
-        {/* right: info */}
-        <aside className="h-fit rounded-[28px] border border-black/10 bg-white p-6 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.35)]">
-          <div className="text-[11px] tracking-[0.28em] text-black/40">
-            LIONETO
-          </div>
-          <h1 className="mt-2 text-[26px] font-semibold tracking-[-0.02em] text-black">
+        {/* RIGHT */}
+        <aside>
+          <h1 className="text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-black">
             {product.title}
           </h1>
 
-          {product.sku ? (
-            <div className="mt-1 text-[13px] text-black/55">
-              Артикул: <span className="text-black/75">{product.sku}</span>
-            </div>
-          ) : null}
-
-          {/* price card */}
-          <div className="mt-5 rounded-[22px] border border-black/10 bg-white p-5">
-            <div className="text-[10px] tracking-[0.18em] uppercase text-black/45">
-              Цена
-            </div>
-            <div className="mt-2 text-[22px] font-semibold tracking-[-0.01em] text-black">
-              {formatPrice(value, currency)}
+          <div className="mt-3 flex items-start justify-between gap-6">
+            <div className="text-[28px] font-semibold text-black">
+              {formatPrice(totalPrice, currency)}
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                onClick={() => toggleCart(product.id)}
-                className={cn(
-                  "cursor-pointer inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[13px] font-medium transition",
-                  inCart
-                    ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                    : "bg-black text-white hover:bg-black/90",
-                )}
-              >
-                <ShoppingCart className="h-4 w-4" />
-                {inCart ? "В корзине" : "Добавить в корзину"}
-              </button>
-
-              <button
-                onClick={() => toggleFav(product.id)}
-                className={cn(
-                  "cursor-pointer inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 text-[13px] font-medium transition",
-                  "border border-black/10 bg-white hover:border-black/20 text-black/75 hover:text-black",
-                )}
-              >
-                <Heart
-                  className={cn("h-4 w-4", fav && "fill-current text-rose-500")}
-                />
-                {fav ? "В избранном" : "В избранное"}
-              </button>
-            </div>
-          </div>
-
-          {/* variants */}
-          {variants.length ? (
-            <div className="mt-6">
-              <div className="text-[10px] tracking-[0.18em] uppercase text-black/45">
-                Цвет
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {variants.map((v, i) => {
-                  const active = i === variantIdx;
-                  return (
-                    <button
-                      key={`${v.label}-${i}`}
-                      onClick={() => setVariantIdx(i)}
-                      className={cn(
-                        "cursor-pointer inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[12px] transition",
-                        active
-                          ? "border-black bg-black text-white"
-                          : "border-black/10 bg-white text-black/70 hover:text-black hover:border-black/20",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "h-3.5 w-3.5 rounded-full border",
-                          active ? "border-white/35" : "border-black/10",
-                        )}
-                        style={{ background: v.swatch }}
-                      />
-                      {v.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="mt-2 text-[12px] text-black/55">
-                Выбрано:{" "}
-                <span className="text-black/75">
-                  {variants[variantIdx]?.label}
-                </span>
-              </div>
-            </div>
-          ) : null}
-
-          {/* description */}
-          <div className="mt-6">
-            <div className="text-[10px] tracking-[0.18em] uppercase text-black/45">
-              Описание
-            </div>
-            <p className="mt-2 text-[13px] leading-relaxed text-black/70">
-              {product.description || "—"}
-            </p>
-          </div>
-
-          {/* specs */}
-          <div className="mt-6">
-            <div className="text-[10px] tracking-[0.18em] uppercase text-black/45">
-              Характеристики
-            </div>
-
-            <div className="mt-3 space-y-2">
-              {specs.map((s, i) => (
-                <div
-                  key={`${s.label}-${i}`}
-                  className="flex items-center justify-between rounded-2xl border border-black/10 bg-white px-4 py-3"
+            <div className="shrink-0">
+              <div className="inline-flex h-10 items-center overflow-hidden border border-black/20 bg-white">
+                <button
+                  onClick={() => setQty((v) => Math.max(1, v - 1))}
+                  className="cursor-pointer grid h-10 w-10 place-items-center border-r border-black/20 hover:bg-black/[0.03] transition"
+                  aria-label="Минус"
+                  type="button"
                 >
-                  <div className="text-[12px] text-black/55">{s.label}</div>
-                  <div className="text-[12px] font-medium text-black/80">
-                    {s.value || "—"}
-                  </div>
+                  <Minus className="h-4 w-4 text-black/70" />
+                </button>
+
+                <div className="grid h-10 w-10 place-items-center text-[13px] font-medium text-black/80">
+                  {qty}
                 </div>
-              ))}
+
+                <button
+                  onClick={() => setQty((v) => v + 1)}
+                  className="cursor-pointer grid h-10 w-10 place-items-center border-l border-black/20 hover:bg-black/[0.03] transition"
+                  aria-label="Плюс"
+                  type="button"
+                >
+                  <Plus className="h-4 w-4 text-black/70" />
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-4">
+            {/* main cart button (toggle) */}
+            <button
+              onClick={toggleMainCart}
+              className={cn(
+                "cursor-pointer inline-flex items-center justify-center gap-2",
+                "h-12 flex-1 rounded-none",
+                "text-[13px] font-semibold transition active:scale-[0.99]",
+                inCart
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "bg-white text-black border border-black/20 hover:bg-black/[0.02]",
+              )}
+              type="button"
+            >
+              {inCart ? (
+                <Check className="h-4 w-4" />
+              ) : (
+                <ShoppingCart className="h-4 w-4" />
+              )}
+              {inCart ? "Добавлено" : "В корзину"}
+            </button>
+
+            {/* buy 1 click (не трогаю логику) */}
+            <button
+              onClick={() => {
+                setCartOnly(product.id, qty);
+                router.push("/checkout");
+              }}
+              className={cn(
+                "cursor-pointer h-12 flex-1 rounded-none",
+                "bg-black text-white text-[13px] font-semibold",
+                "hover:bg-black/90 transition active:scale-[0.99]",
+              )}
+              type="button"
+            >
+              Купить в 1 клик
+            </button>
           </div>
         </aside>
       </div>
 
-      {/* related */}
-      <section className="mt-10">
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-black">
-          Что покупают с этим товаром
+      <div className="mt-10 grid gap-10 lg:grid-cols-2">
+        <section>
+          <h2 className="text-[16px] font-semibold text-black">Описание</h2>
+          <p className="mt-3 text-[13px] leading-relaxed text-black/70 whitespace-pre-line">
+            {product.description || "—"}
+          </p>
+        </section>
+
+        <section>
+          <h2 className="text-[16px] font-semibold text-black">
+            Дополнительная информация
+          </h2>
+
+          <div className="mt-4 space-y-2 text-[13px] text-black/70">
+            <Row
+              label="Артикул"
+              value={product.extra?.article || product.sku || "—"}
+            />
+            <Row label="Размер" value={product.extra?.size || "—"} />
+            <Row label="Цвет" value={product.extra?.color || "—"} />
+            <Row label="Материал" value={product.extra?.material || "—"} />
+          </div>
+        </section>
+      </div>
+
+      <section className="mt-12">
+        <h2 className="text-[20px] font-semibold text-black">
+          С этим товаром покупают
         </h2>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          {related.map((p) => {
-            const relValue = currency === "RUB" ? p.price_rub : p.price_uzs;
+        <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {(product.related ?? []).slice(0, 4).map((p) => {
+            const v = currency === "RUB" ? p.price_rub : p.price_uzs;
+            const relInCart = isInCart(p.id);
 
             return (
-              <Link
-                key={p.id}
-                href={p.href}
-                className={cn(
-                  "group block overflow-hidden rounded-3xl border border-black/10 bg-white",
-                  "shadow-[0_10px_30px_rgba(0,0,0,0.06)] transition hover:border-black/20",
-                )}
-              >
-                <div className="relative aspect-[16/10]">
+              <Link key={p.id} href={p.href} className="group block">
+                <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-black/[0.03]">
                   <Image
                     src={p.image}
                     alt={p.title}
                     fill
-                    className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
-                    sizes="(max-width: 1024px) 100vw, 520px"
+                    className="object-contain transition duration-700 group-hover:scale-[1.03]"
+                    sizes="260px"
                   />
-                  {p.badge ? (
-                    <div className="absolute left-3 top-3">
-                      <span
-                        className={cn(
-                          "inline-flex items-center h-7 px-3 rounded-[12px]",
-                          "bg-white/88 backdrop-blur-xl",
-                          "border border-amber-400/70",
-                          "text-[12px] font-medium text-amber-700",
-                          "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
-                        )}
-                      >
-                        {p.badge}
-                      </span>
-                    </div>
-                  ) : null}
                 </div>
 
-                <div className="p-4">
-                  <div className="text-[13px] font-medium text-black/85 line-clamp-2">
-                    {p.title}
-                  </div>
-                  <div className="mt-2 text-[15px] font-semibold text-black">
-                    {formatPrice(relValue, currency)}
-                  </div>
-                  <div className="mt-3 text-[11px] tracking-[0.18em] uppercase text-black/45">
-                    Открыть товар →
-                  </div>
+                <div className="mt-3 text-[12px] text-black/55">
+                  {formatPrice(v, currency)}
                 </div>
+                <div className="mt-1 text-[12px] leading-snug text-black/75 line-clamp-2">
+                  {p.title}
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (relInCart) removeFromCart(p.id);
+                    else addToCart(p.id, 1);
+                  }}
+                  className={cn(
+                    "mt-3 w-full h-10 rounded-none text-[12px] font-semibold transition cursor-pointer",
+                    relInCart
+                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                      : "bg-black text-white hover:bg-black/90",
+                  )}
+                >
+                  {relInCart ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Check className="h-4 w-4" /> Добавлено
+                    </span>
+                  ) : (
+                    "В корзину"
+                  )}
+                </button>
               </Link>
             );
           })}
         </div>
       </section>
 
-      {/* lightbox */}
-      {lightboxOpen ? (
+      {/* LIGHTBOX */}
+      {lightboxOpen && (
         <div
-          className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-sm"
-          onMouseDown={(e) => {
-            // закрываем только если клик по фону
-            if (e.target === e.currentTarget) setLightboxOpen(false);
-          }}
+          className="fixed inset-0 z-[9999] bg-black/85"
+          onClick={() => setLightboxOpen(false)}
         >
-          <div className="absolute inset-0 flex items-center justify-center p-4">
-            <div className="relative w-full max-w-[1100px]">
+          <div
+            className="absolute inset-0 flex items-center justify-center p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative w-full max-w-[1200px]">
+              <div className="relative aspect-[16/10] w-full overflow-hidden rounded-3xl bg-black">
+                <Image
+                  src={gallery[lightboxIdx]}
+                  alt={`${product.title} ${lightboxIdx + 1}`}
+                  fill
+                  className="object-contain"
+                  sizes="1200px"
+                />
+              </div>
+
               <button
-                className={cn(
-                  "cursor-pointer absolute -top-12 right-0",
-                  "inline-flex items-center gap-2 rounded-full border px-4 py-2",
-                  "bg-white/85 backdrop-blur-xl border-white/20 text-white",
-                  "hover:bg-white/90 hover:text-black transition",
-                )}
+                type="button"
                 onClick={() => setLightboxOpen(false)}
+                className="absolute -top-3 -right-3 h-10 w-10 rounded-full bg-white/95 grid place-items-center cursor-pointer"
+                aria-label="Закрыть"
               >
-                <X className="h-4 w-4" />
-                Закрыть
+                <X className="h-5 w-5 text-black/70" />
               </button>
 
-              <div className="relative overflow-hidden rounded-[24px] border border-white/15 bg-black">
-                <ArrowBtn
-                  dir="left"
-                  disabled={!canPrev}
-                  onClick={prev}
-                  className="border-white/15 bg-white/10 hover:bg-white/15"
-                />
-                <ArrowBtn
-                  dir="right"
-                  disabled={!canNext}
-                  onClick={next}
-                  className="border-white/15 bg-white/10 hover:bg-white/15"
-                />
+              {gallery.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={prevLb}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/95 grid place-items-center cursor-pointer"
+                    aria-label="Назад"
+                  >
+                    <ChevronLeft className="h-6 w-6 text-black/70" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={nextLb}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/95 grid place-items-center cursor-pointer"
+                    aria-label="Вперёд"
+                  >
+                    <ChevronRight className="h-6 w-6 text-black/70" />
+                  </button>
 
-                <div className="relative w-full aspect-[16/10]">
-                  <Image
-                    src={gallery[activeIdx]}
-                    alt={product.title}
-                    fill
-                    className="object-contain"
-                    sizes="(max-width: 1200px) 100vw, 1100px"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center justify-center gap-2 text-[12px] text-white/75">
-                <span>
-                  {activeIdx + 1}/{gallery.length}
-                </span>
-                <span className="text-white/35">•</span>
-                <span>←/→ переключение, ESC закрыть</span>
-              </div>
+                  {/* счётчик */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-[12px] text-black/70">
+                    {lightboxIdx + 1} / {maxLen}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
-      ) : null}
+      )}
     </main>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-[120px] shrink-0 text-black/45">{label}</div>
+      <div className="flex-1 border-b border-dotted border-black/20 pb-1">
+        {value}
+      </div>
+    </div>
   );
 }

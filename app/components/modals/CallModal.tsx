@@ -100,9 +100,7 @@ export default function CallModal({
           >
             ОТПРАВИТЬ
           </button>
-          <div className="mt-3 text-center text-[12px] text-black/45">
-            Далее подключим реальную отправку (Strapi/CRM).
-          </div>
+          <div className="mt-3 text-center text-[12px] text-black/45">.</div>
         </div>
       </form>
     </Modal>
