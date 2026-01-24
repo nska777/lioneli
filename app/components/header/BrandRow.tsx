@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Search, User, ShoppingCart, Heart } from "lucide-react";
 import { useShopState } from "../../context/shop-state";
 import Image from "next/image";
 import Link from "next/link";
 
+import { supabase } from "@/app/lib/supabase/client";
 import { getDict, t as tByKey } from "@/i18n";
 
 function IconBtn({
@@ -54,6 +55,27 @@ export default function BrandRow({
 
   const dict = useMemo(() => getDict(lang), [lang]);
   const t = (key: string) => tByKey(dict, key);
+
+  // ✅ ACCOUNT LINK: если есть сессия → /account, иначе → /auth?next=/account
+  const [accountHref, setAccountHref] = useState("/auth?next=/account");
+
+  useEffect(() => {
+    let mounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!mounted) return;
+      setAccountHref(data.session ? "/account" : "/auth?next=/account");
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAccountHref(session ? "/account" : "/auth?next=/account");
+    });
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
 
   return (
     <div className="py-1.5 md:py-2.5">
@@ -146,20 +168,13 @@ export default function BrandRow({
               label={t("header.ariaSearch")}
               onClick={() => {
                 // позже: открыть модалку поиска
-                // console.log("open search");
               }}
             >
               <Search className="h-5 w-5" />
             </IconBtn>
 
             {/* ACCOUNT */}
-            <IconBtn
-              label={t("header.ariaAccount")}
-              onClick={() => {
-                // позже: открыть логин/аккаунт
-                // console.log("open account");
-              }}
-            >
+            <IconBtn label={t("header.ariaAccount")} href={accountHref}>
               <User className="h-5 w-5" />
             </IconBtn>
 
