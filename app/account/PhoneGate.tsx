@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { supabase } from "@/app/lib/supabase/client";
-import { Phone } from "lucide-react";
+import { Phone, X } from "lucide-react";
 import { useRegionLang } from "@/app/context/region-lang";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
@@ -26,9 +26,13 @@ function normalizePhoneToE164(raw: string, region: "uz" | "ru") {
 
 export default function PhoneGate({
   userId,
+  initialPhone = "",
+  onClose,
   onSaved,
 }: {
   userId: string;
+  initialPhone?: string;
+  onClose?: () => void;
   onSaved: (p: {
     full_name: string | null;
     phone_e164: string | null;
@@ -37,7 +41,8 @@ export default function PhoneGate({
 }) {
   const { region } = useRegionLang() as { region: "uz" | "ru" };
 
-  const [raw, setRaw] = useState("");
+  // ✅ если пришёл initialPhone — показываем его в поле (в сыром виде)
+  const [raw, setRaw] = useState(initialPhone);
   const phone = useMemo(() => normalizePhoneToE164(raw, region), [raw, region]);
 
   const [saving, setSaving] = useState(false);
@@ -72,20 +77,34 @@ export default function PhoneGate({
 
   return (
     <div className="mb-6 rounded-[28px] border border-black/10 bg-black/[0.02] p-5">
-      <div>
-        <div className="text-[12px] tracking-[0.22em] uppercase text-black/50">
-          Обязательный шаг
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-[12px] tracking-[0.22em] uppercase text-black/50">
+            {initialPhone ? "Редактирование" : "Обязательный шаг"}
+          </div>
+          <div className="mt-1 text-[18px] tracking-[-0.01em]">
+            Укажите номер телефона
+          </div>
+          <p className="mt-2 text-[13px] text-black/60">
+            {initialPhone
+              ? "Вы можете обновить номер телефона в профиле."
+              : "Пока телефон не заполнен, остальные разделы недоступны."}
+          </p>
         </div>
-        <div className="mt-1 text-[18px] tracking-[-0.01em]">
-          Укажите номер телефона
-        </div>
-        <p className="mt-2 text-[13px] text-black/60">
-          Пока телефон не заполнен, остальные разделы недоступны.
-        </p>
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="h-10 w-10 rounded-2xl border border-black/10 bg-white text-black/70 hover:text-black hover:bg-black/[0.03] transition cursor-pointer grid place-items-center"
+            aria-label="Закрыть"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] items-end">
-        <div className="rounded-2xl border border-black/10 bg-white px-4 py-3">
+        <div className="rounded-2xl border border-black/10 bg-white px-4 py-3 transition focus-within:border-black/25 focus-within:shadow-[0_10px_30px_rgba(0,0,0,0.07)]">
           <div className="flex items-center gap-2">
             <Phone className="h-4 w-4 text-black/50" />
             <input

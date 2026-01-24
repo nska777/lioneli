@@ -18,11 +18,13 @@ export default function AccountProfile({
   email,
   profile,
   onProfile,
+  onEditPhone,
 }: {
   userId: string;
   email: string | null;
   profile: ProfileRow | null;
   onProfile: (p: ProfileRow) => void;
+  onEditPhone: () => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(profile?.full_name ?? "");
@@ -118,14 +120,27 @@ export default function AccountProfile({
             <span>{email ?? "—"}</span>
           </div>
 
-          <div className="flex items-center gap-2 text-[14px] text-black/75">
-            <Phone className="h-4 w-4 text-black/50" />
-            <span>{profile?.phone_e164 ?? "—"}</span>
-            {profile?.phone_e164 && (
-              <span className="ml-2 text-[12px] text-black/45">
-                {profile?.phone_verified ? "подтверждён" : "не подтверждён"}
+          {/* Телефон + кнопка "Изменить" */}
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-black/10 px-4 py-3">
+            <div className="flex items-center gap-2 text-[14px] text-black/75">
+              <Phone className="h-4 w-4 text-black/50" />
+              <span>{profile?.phone_e164 ?? "—"}</span>
+              {profile?.phone_e164 && (
+                <span className="ml-2 text-[12px] text-black/45">
+                  {profile?.phone_verified ? "подтверждён" : "не подтверждён"}
+                </span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={onEditPhone}
+              className="h-9 px-3 rounded-2xl border border-black/10 bg-white text-black/70 hover:text-black hover:bg-black/[0.03] transition cursor-pointer"
+            >
+              <span className="text-[11px] tracking-[0.18em] uppercase">
+                Изменить
               </span>
-            )}
+            </button>
           </div>
         </div>
 

@@ -5,43 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Heart,
-  ShoppingCart,
-  ListChecks,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { useRegionLang } from "../../context/region-lang";
-import { useShopState } from "../../context/shop-state";
+import { useRegionLang } from "@/app/context/region-lang";
+import ProductActions from "@/app/catalog/ProductActions"; // ⚠️ поправь путь если надо
+import { CATALOG_MOCK } from "@/app/lib/mock/catalog-products"; // ⚠️ поправь путь если надо
 
 gsap.registerPlugin(ScrollTrigger);
-
-type StrapiImage = {
-  url: string;
-  alternativeText?: string | null;
-  width?: number | null;
-  height?: number | null;
-};
-
-export type BestPriceItem = {
-  id: string;
-  title: string;
-  subtitle?: string;
-  sku?: string;
-  href?: string;
-
-  image: StrapiImage;
-
-  price_uzs: number;
-  price_rub: number;
-
-  old_price_uzs?: number | null;
-  old_price_rub?: number | null;
-
-  discountPercent?: number | null; // если есть, но нет old_price — посчитаем
-};
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -61,13 +31,20 @@ function formatPrice(value: number, currency: "RUB" | "UZS") {
   }
 }
 
-function pickPrice(item: BestPriceItem, region: "uz" | "ru") {
-  return region === "ru" ? item.price_rub : item.price_uzs;
-}
-function pickOldPriceRaw(item: BestPriceItem, region: "uz" | "ru") {
-  const v = region === "ru" ? item.old_price_rub : item.old_price_uzs;
-  return typeof v === "number" ? v : null;
-}
+type BestPriceUIItem = {
+  id: string;
+  title: string;
+  href: string;
+  image: string;
+  price_rub: number;
+  price_uzs: number;
+  old_price_rub?: number | null;
+  old_price_uzs?: number | null;
+  discountPercent?: number | null;
+  badge: string; // “Лучшая цена”
+  skuLabel?: string | null;
+};
+
 function calcOldFromDiscount(price: number, discountPercent?: number | null) {
   if (!discountPercent || discountPercent <= 0) return null;
   const d = discountPercent / 100;
@@ -76,83 +53,16 @@ function calcOldFromDiscount(price: number, discountPercent?: number | null) {
   return Math.round(old);
 }
 
-// ✅ fallback (БЕЗ ДУБЛЕЙ — иначе будет ошибка key)
-const fallbackItems: BestPriceItem[] = [
-  {
-    id: "bp-1",
-    title: "Шкаф Makassar — лучшая цена",
-    sku: "Арт. MR7116",
-    href: "/product/makassar-wardrobe",
-    image: { url: "/mock/bed-1.jpg", alternativeText: "Makassar" },
-    price_rub: 158674,
-    old_price_rub: 198674,
-    price_uzs: 23800000,
-    old_price_uzs: 29800000,
-  },
-  {
-    id: "bp-2",
-    title: "Кровать 160x200 Modena",
-    sku: "Арт. KP6820",
-    href: "/product/modena-160",
-    image: { url: "/mock/bed-2.jpg", alternativeText: "Modena" },
-    price_rub: 147274,
-    old_price_rub: 179900,
-    price_uzs: 22100000,
-    old_price_uzs: 27000000,
-  },
-  {
-    id: "bp-3",
-    title: "Кровать 140x200 Signoria",
-    subtitle: "Бежевая роза",
-    href: "/product/signoria-140",
-    image: { url: "/mock/bed-3.jpg", alternativeText: "Signoria" },
-    price_rub: 70704,
-    old_price_rub: 141408,
-    price_uzs: 10600000,
-    old_price_uzs: 21200000,
-    discountPercent: 50,
-  },
-  {
-    id: "bp-4",
-    title: "Комод Modena — скидка",
-    sku: "Арт. K603",
-    href: "/product/komod-modena",
-    image: { url: "/products/4.jpg", alternativeText: "Modena" },
-    price_rub: 139800,
-    discountPercent: 20, // ✅ покажем зачеркнутую цену даже если old_price нет
-    price_uzs: 19900000,
-  },
-  {
-    id: "bp-5",
-    title: "Тумба прикроватная Makassar",
-    sku: "Арт. MR701",
-    href: "/product/makassar",
-    image: { url: "/products/3.jpg", alternativeText: "Makassar" },
-    price_rub: 58700,
-    old_price_rub: 73900,
-    price_uzs: 8350000,
-    old_price_uzs: 10400000,
-  },
-];
-
 export default function BestPrice({
   title = "Лучшая цена",
-  items,
-  onOpenSpecs,
 }: {
   title?: string;
-  items?: BestPriceItem[];
-  onOpenSpecs?: (item: BestPriceItem) => void;
 }) {
   const { region } = useRegionLang();
   const currency: "RUB" | "UZS" = region === "ru" ? "RUB" : "UZS";
 
-  const { favorites, toggleFav, cart, toggleCart } = useShopState();
-
   const rootRef = useRef<HTMLElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
-
-  const list = useMemo(() => (items?.length ? items : fallbackItems), [items]);
 
   const [page, setPage] = useState(0);
   const [pages, setPages] = useState(1);
@@ -162,50 +72,49 @@ export default function BestPrice({
     return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   }, []);
 
-  // ❤️ pop (как BestSellers)
-  const pop = (el: HTMLElement, kind: "on" | "off" = "on") => {
-    if (reducedMotion) return;
-    gsap.killTweensOf(el);
-    gsap.set(el, { transformOrigin: "50% 50%" });
+  const list = useMemo<BestPriceUIItem[]>(() => {
+    const all = (CATALOG_MOCK ?? []) as any[];
 
-    const amp = kind === "on" ? 1.24 : 1.14;
-    const rot = kind === "on" ? -10 : 6;
+    const isBest = (p: any) => {
+      const b = String(p.badge || "").toLowerCase();
+      return b.includes("лучшая") || b.includes("best");
+    };
 
-    gsap.fromTo(
-      el,
-      { scale: 1, rotate: 0 },
-      {
-        scale: amp,
-        rotate: rot,
-        duration: 0.18,
-        ease: "power3.out",
-        yoyo: true,
-        repeat: 1,
-        onComplete: () => gsap.set(el, { rotate: 0, scale: 1 }),
-      },
-    );
-  };
+    const best = all.filter(isBest);
+    const need = 10;
 
-  // 🛒 pop лёгкий
-  const popCart = (el: HTMLElement) => {
-    if (reducedMotion) return;
-    gsap.killTweensOf(el);
-    gsap.set(el, { transformOrigin: "50% 50%" });
-    gsap.fromTo(
-      el,
-      { scale: 1 },
-      {
-        scale: 1.18,
-        duration: 0.16,
-        ease: "power3.out",
-        yoyo: true,
-        repeat: 1,
-        onComplete: () => gsap.set(el, { scale: 1 }),
-      },
-    );
-  };
+    const used = new Set(best.map((p: any) => String(p.id)));
+    const extra = all.filter((p: any) => !used.has(String(p.id)));
 
-  // ✅ страницы: desktop = 3 (и 4-я слегка выглядывает)
+    const src = [...best, ...extra].slice(0, Math.min(need, all.length));
+
+    return src.map((p: any, idx: number) => {
+      const discountPercent =
+        typeof p.discountPercent === "number"
+          ? p.discountPercent
+          : idx % 3 === 0
+            ? 20
+            : idx % 5 === 0
+              ? 35
+              : null;
+
+      return {
+        id: String(p.id),
+        title: p.title,
+        href: `/product/${p.id}`,
+        image: p.image,
+        price_rub: Number(p.price_rub ?? 0),
+        price_uzs: Number(p.price_uzs ?? 0),
+        old_price_rub: (p as any).old_price_rub ?? null,
+        old_price_uzs: (p as any).old_price_uzs ?? null,
+        discountPercent,
+        badge: "Лучшая цена",
+        skuLabel: p.sku ? String(p.sku) : `ID: ${p.id}`,
+      };
+    });
+  }, []);
+
+  // ✅ pages
   useLayoutEffect(() => {
     if (!rootRef.current) return;
 
@@ -222,7 +131,7 @@ export default function BestPrice({
     return () => window.removeEventListener("resize", calcPages);
   }, [list.length]);
 
-  // ✅ листание трека
+  // ✅ slide
   useLayoutEffect(() => {
     if (!rootRef.current || !trackRef.current) return;
 
@@ -231,7 +140,7 @@ export default function BestPrice({
     ) as HTMLElement | null;
     if (!card) return;
 
-    const gap = 24; // gap-6
+    const gap = 24;
     const cw = card.getBoundingClientRect().width;
     const perView =
       window.innerWidth >= 1024 ? 3 : window.innerWidth >= 768 ? 2 : 1;
@@ -245,7 +154,7 @@ export default function BestPrice({
     gsap.to(trackRef.current, { x: -shift, duration: 0.9, ease: "expo.out" });
   }, [page, reducedMotion, list.length]);
 
-  // ✅ hover actions show/hide (GSAP)
+  // ✅ hover actions show/hide
   useLayoutEffect(() => {
     if (!rootRef.current) return;
 
@@ -312,7 +221,7 @@ export default function BestPrice({
     return () => cleanups.forEach((fn) => fn());
   }, [list.length, reducedMotion]);
 
-  // ✅ reveal (wind+blur+clip)
+  // ✅ reveal
   useLayoutEffect(() => {
     if (!rootRef.current) return;
     if (reducedMotion) return;
@@ -346,7 +255,6 @@ export default function BestPrice({
       });
     if (dots) gsap.set(dots, { autoAlpha: 0, y: 10, filter: "blur(8px)" });
     if (wind) gsap.set(wind, { xPercent: -140, autoAlpha: 0 });
-
     if (cards.length) gsap.set(cards, { y: 10, filter: "blur(6px)" });
 
     tl.to(
@@ -471,31 +379,37 @@ export default function BestPrice({
           </div>
         </div>
 
-        {/* viewport (3 карточки упираются в контейнер + 4-я еле выглядывает на lg) */}
+        {/* viewport */}
         <div data-reveal="viewport" className={cn("mt-8 overflow-hidden")}>
           <div
             ref={trackRef}
-            className={cn("flex gap-6 will-change-transform", "justify-start")}
+            className="flex gap-6 will-change-transform"
             style={{ transform: "translateZ(0)" }}
           >
             {list.map((p, idx) => {
-              const price = pickPrice(p, region);
-              const oldRaw = pickOldPriceRaw(p, region);
+              const price = currency === "RUB" ? p.price_rub : p.price_uzs;
+              const oldRaw =
+                currency === "RUB" ? p.old_price_rub : p.old_price_uzs;
               const oldCalc =
                 oldRaw ?? calcOldFromDiscount(price, p.discountPercent);
               const old = oldCalc && oldCalc > price ? oldCalc : null;
 
-              const fav = favorites.includes(p.id);
-              const inCart = (cart[p.id] ?? 0) > 0;
+              const snapshot = {
+                title: p.title,
+                href: p.href,
+                imageUrl: p.image,
+                sku: p.skuLabel ?? null,
+                price_uzs: p.price_uzs,
+                price_rub: p.price_rub,
+              };
 
               return (
                 <Link
-                  key={`${p.id}-${idx}`} // ✅ фикс "same key"
-                  href={p.href ?? "#"}
+                  key={`${p.id}-${idx}`}
+                  href={p.href}
                   data-card
                   className={cn(
                     "group block shrink-0 cursor-pointer",
-                    // ✅ 3 влезают в контент контейнера, 4-я еле выглядывает (~40px) на 1200 max
                     "w-[260px] sm:w-[270px] md:w-[300px] lg:w-[360px]",
                   )}
                 >
@@ -509,106 +423,48 @@ export default function BestPrice({
                     )}
                   >
                     <div className="relative overflow-hidden rounded-t-[22px]">
+                      {/* badge */}
+                      <div className="absolute left-2 top-2 z-10">
+                        <span
+                          className={cn(
+                            "inline-flex items-center",
+                            "h-7 px-3 rounded-[12px]",
+                            "bg-white/88 backdrop-blur-xl",
+                            "border border-emerald-400/60",
+                            "text-[12px] font-medium text-emerald-700",
+                            "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
+                          )}
+                        >
+                          {p.badge}
+                        </span>
+                      </div>
+
                       {/* actions */}
                       <div
                         data-actions
-                        className="absolute right-2 top-2 z-20 flex flex-col gap-2"
+                        className="absolute right-2 top-2 z-10"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
                       >
-                        {/* fav */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-
-                            const svg = (e.currentTarget.querySelector("svg") ||
-                              e.currentTarget) as HTMLElement;
-
-                            pop(svg, fav ? "off" : "on");
-                            toggleFav(p.id);
+                        <ProductActions
+                          id={p.id}
+                          snapshot={snapshot}
+                          onOpenSpecs={() => {
+                            window.location.href = p.href;
                           }}
-                          className={cn(
-                            "h-9 w-9 rounded-full grid place-items-center",
-                            "bg-white/88 backdrop-blur-xl",
-                            "border border-black/10",
-                            "shadow-[0_14px_40px_rgba(0,0,0,0.16)]",
-                            "cursor-pointer transition",
-                          )}
-                          aria-label={
-                            fav ? "Убрать из избранного" : "В избранное"
-                          }
-                        >
-                          <Heart
-                            className={cn(
-                              "h-4 w-4 transition",
-                              fav
-                                ? "text-rose-500 fill-rose-500"
-                                : "text-black/70",
-                            )}
-                          />
-                        </button>
-
-                        {/* cart */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-
-                            const svg = (e.currentTarget.querySelector("svg") ||
-                              e.currentTarget) as HTMLElement;
-                            popCart(svg);
-
-                            toggleCart(p.id);
-                          }}
-                          className={cn(
-                            "h-9 w-9 rounded-full grid place-items-center",
-                            "bg-white/88 backdrop-blur-xl",
-                            "border border-black/10",
-                            "shadow-[0_14px_40px_rgba(0,0,0,0.16)]",
-                            "cursor-pointer transition",
-                            inCart ? "ring-1 ring-emerald-500/40" : "",
-                          )}
-                          aria-label={
-                            inCart ? "Убрать из корзины" : "Добавить в корзину"
-                          }
-                        >
-                          <ShoppingCart
-                            className={cn(
-                              "h-4 w-4 transition",
-                              inCart ? "text-emerald-600" : "text-black/70",
-                            )}
-                          />
-                        </button>
-
-                        {/* specs (без alert) */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onOpenSpecs?.(p);
-                          }}
-                          className={cn(
-                            "h-9 w-9 rounded-full grid place-items-center",
-                            "bg-white/88 backdrop-blur-xl",
-                            "border border-black/10",
-                            "shadow-[0_14px_40px_rgba(0,0,0,0.16)]",
-                            "cursor-pointer transition",
-                          )}
-                          aria-label="Характеристики"
-                        >
-                          <ListChecks className="h-4 w-4 text-black/70" />
-                        </button>
+                        />
                       </div>
 
                       {/* image */}
                       <div className="relative aspect-[4/3] bg-black/[0.02] flex-shrink-0">
                         <Image
-                          src={p.image.url}
-                          alt={p.image.alternativeText ?? p.title}
+                          src={p.image}
+                          alt={p.title}
                           fill
                           className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                          priority={idx < 6}
                         />
                         <div
                           className="pointer-events-none absolute inset-x-0 bottom-0 h-20"
@@ -627,7 +483,6 @@ export default function BestPrice({
                           <div className="text-[20px] font-semibold tracking-[-0.01em] text-black">
                             {formatPrice(price, currency)}
                           </div>
-
                           {old ? (
                             <div className="text-[12px] text-black/40 line-through">
                               {formatPrice(old, currency)}
@@ -637,19 +492,11 @@ export default function BestPrice({
 
                         <div className="mt-2 text-[14px] leading-snug text-black/70 line-clamp-2">
                           {p.title}
-                          {p.subtitle ? ` ${p.subtitle}` : ""}
                         </div>
                       </div>
 
-                      {p.sku ? (
-                        <div className="mt-2 text-[12px] text-black/35">
-                          {p.sku}
-                        </div>
-                      ) : (
-                        <div className="mt-2 text-[12px] text-transparent">
-                          —
-                        </div>
-                      )}
+                      {/* ✅ визуально убрано */}
+                      <div className="mt-2 text-[12px] text-transparent">—</div>
                     </div>
                   </div>
                 </Link>

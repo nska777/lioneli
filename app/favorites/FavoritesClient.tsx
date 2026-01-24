@@ -5,9 +5,9 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, HeartOff, ShoppingBag, Trash2 } from "lucide-react";
 
-import { useRegionLang } from "..//context/region-lang";
+import { useRegionLang } from "../context/region-lang";
 import { useShopState } from "../context/shop-state";
-import { byId } from "../lib/mock/products";
+import { CATALOG_BY_ID, CATALOG_MOCK } from "../lib/mock/catalog-products";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -51,23 +51,27 @@ export default function FavoritesClient() {
   const items = useMemo(() => {
     return favIds
       .map((id) => {
-        const p = byId.get(id);
+        const p = CATALOG_BY_ID.get(id);
         if (!p) return null;
-        const price = region === "uz" ? p.price.uzs : p.price.rub;
+
+        const price = region === "uz" ? p.price_uzs : p.price_rub;
+
         return { id, product: p, price };
       })
-      .filter(Boolean) as Array<{ id: string; product: any; price: number }>;
+      .filter(Boolean) as Array<{
+      id: string;
+      product: (typeof CATALOG_MOCK)[number];
+      price: number;
+    }>;
   }, [favIds, region]);
 
-  // лёгкие рекомендации: просто покажем 3 товара, которые НЕ в избранном
+  // рекомендации: 3 товара, которых нет в избранном
   const recommended = useMemo(() => {
-    const all = Array.from(byId.values());
     const set = new Set(favIds);
-    return all.filter((p) => !set.has(p.id)).slice(0, 3);
+    return CATALOG_MOCK.filter((p) => !set.has(p.id)).slice(0, 3);
   }, [favIds]);
 
   const clearFavorites = () => {
-    // у нас нет clearFavorites — сделаем аккуратно через toggleFav
     favIds.forEach((id) => shop.toggleFav(id));
   };
 
@@ -141,7 +145,7 @@ export default function FavoritesClient() {
               >
                 <div className="flex gap-4">
                   <Link
-                    href={it.product.href}
+                    href={`/catalog?product=${it.product.id}`}
                     className="cursor-pointer relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-black/5"
                   >
                     <SafeImage src={it.product.image} alt={it.product.title} />
@@ -151,16 +155,14 @@ export default function FavoritesClient() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <Link
-                          href={it.product.href}
+                          href={`/catalog?product=${it.product.id}`}
                           className="cursor-pointer block truncate text-base font-medium tracking-[-0.01em] hover:underline"
                         >
                           {it.product.title}
                         </Link>
-                        {it.product.sku && (
-                          <div className="mt-1 text-xs text-black/45">
-                            SKU: {it.product.sku}
-                          </div>
-                        )}
+                        <div className="mt-1 text-xs text-black/45">
+                          ID: {it.product.id}
+                        </div>
                       </div>
 
                       <button
@@ -185,7 +187,7 @@ export default function FavoritesClient() {
 
                     <div className="mt-4 flex flex-wrap gap-3">
                       <Link
-                        href={it.product.href}
+                        href={`/catalog?product=${it.product.id}`}
                         className="cursor-pointer inline-flex items-center justify-center rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black/75 hover:text-black hover:border-black/20 transition"
                       >
                         Смотреть
@@ -194,14 +196,8 @@ export default function FavoritesClient() {
                       <button
                         type="button"
                         onClick={() => {
-                          // добавим в корзину и откроем корзину (или просто добавим — на твоё усмотрение)
-                          if (typeof (shop as any)?.addToCart === "function")
-                            (shop as any).addToCart(it.id, 1);
-                          else if (
-                            typeof (shop as any)?.toggleCart === "function"
-                          )
-                            (shop as any).toggleCart(it.id);
-                          // откроем корзину
+                          // ✅ единая логика корзины
+                          shop.toggleCart(it.id);
                           window.location.href = "/cart";
                         }}
                         className="cursor-pointer inline-flex items-center justify-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition"
@@ -236,7 +232,7 @@ export default function FavoritesClient() {
             {recommended.map((p) => (
               <Link
                 key={p.id}
-                href={p.href}
+                href={`/catalog?product=${p.id}`}
                 className="group flex items-center gap-3 rounded-2xl border border-black/10 bg-white p-3 hover:border-black/20 transition cursor-pointer"
               >
                 <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-black/5 shrink-0">
@@ -248,7 +244,7 @@ export default function FavoritesClient() {
                   </div>
                   <div className="text-xs text-black/45">
                     {formatMoney(
-                      region === "uz" ? p.price.uzs : p.price.rub,
+                      region === "uz" ? p.price_uzs : p.price_rub,
                       region,
                     )}
                   </div>

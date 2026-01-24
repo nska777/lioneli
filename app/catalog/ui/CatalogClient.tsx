@@ -2,161 +2,26 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import gsap from "gsap";
-import { Heart, ShoppingCart } from "lucide-react";
 
-import { useRegionLang } from "../../context/region-lang";
-import { useShopState } from "../../context/shop-state";
+import { useRegionLang } from "@/app/context/region-lang";
 
 import FiltersSidebar, { FiltersMeta, FiltersValue } from "./FiltersSidebar";
+import ProductActions from "../ProductActions";
+
+import {
+  BRANDS,
+  CATS,
+  MENU_ITEMS,
+  COLLECTION_ITEMS,
+  TYPE_ITEMS,
+  CATALOG_MOCK as MOCK,
+} from "@/app/lib/mock/catalog-products";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
-
-// Верхний фильтр (бренды/категории бренда)
-const BRANDS = [
-  { title: "АМБЕР", slug: "amber" },
-  { title: "СКАНДИ", slug: "scandi" },
-  { title: "ЭЛИЗАБЕТ", slug: "elizabeth" },
-  { title: "САЛЬВАДОР", slug: "salvador" },
-  { title: "ПИТТИ", slug: "pitti" },
-  { title: "БОНЖОРНО", slug: "bonjorno" },
-] as const;
-
-const CATS = [
-  { title: "Спальни", slug: "bedrooms" },
-  { title: "Гостиные", slug: "living" },
-  { title: "Молодежные", slug: "youth" },
-  { title: "Прихожие", slug: "hallway" },
-  { title: "Столы и стулья", slug: "tables" },
-] as const;
-
-// Левый сайдбар
-const MENU_ITEMS = [
-  { label: "Столы и стулья", value: "menu_tables" },
-  { label: "Шкафы купе", value: "menu_wardrobe" },
-  { label: "Кабинеты", value: "menu_office" },
-  { label: "Прихожие", value: "menu_hallway" },
-  { label: "Гостиные", value: "menu_living" },
-  { label: "Спальни", value: "menu_bedrooms" },
-];
-
-const COLLECTION_ITEMS = [
-  { label: "Bergen Dark", value: "bergen_dark" },
-  { label: "Bergen Dub", value: "bergen_dub" },
-  { label: "Bergen Latte", value: "bergen_latte" },
-  { label: "Bergen White", value: "bergen_white" },
-  { label: "Bryce", value: "bryce" },
-  { label: "Florence Bianco", value: "florence_bianco" },
-  { label: "Florence Ciliegio", value: "florence_ciliegio" },
-  { label: "Makassar Dub", value: "makassar_dub" },
-  { label: "Modena", value: "modena" },
-];
-
-const TYPE_ITEMS = [
-  { label: "Комоды", value: "komody" },
-  { label: "Консоли", value: "konsoli" },
-  { label: "Столы обеденные", value: "stoly_obed" },
-  { label: "Столы письменные", value: "stoly_pism" },
-  { label: "Стулья и кресла", value: "stulya_kresla" },
-  { label: "Тумбы ТВ", value: "tumby_tv" },
-  { label: "Шкафы", value: "shkafy" },
-  { label: "Витрины", value: "vitriny" },
-  { label: "Библиотеки и стеллажи", value: "stellazhi" },
-  { label: "Полукресла", value: "polukresla" },
-];
-
-// ✅ локальные демо-фото (лежат в public/demo/products)
-const DEMO_IMAGES = [
-  "/demo/products/p1.jpg",
-  "/demo/products/p2.jpg",
-  "/demo/products/p3.jpg",
-  "/demo/products/p4.jpg",
-  "/demo/products/p5.jpg",
-  "/demo/products/p6.jpg",
-  "/demo/products/p7.jpg",
-  "/demo/products/p8.jpg",
-  "/demo/products/p9.jpg",
-  "/demo/products/p10.jpg",
-  "/demo/products/p11.jpg",
-  "/demo/products/p12.jpg",
-];
-
-// ✅ мок — сразу с полями под будущий Strapi
-const MOCK = Array.from({ length: 24 }).map((_, i) => {
-  const brand = BRANDS[i % BRANDS.length].slug;
-  const category = CATS[i % CATS.length].slug;
-
-  const menu = MENU_ITEMS[i % MENU_ITEMS.length].value;
-  const collection = COLLECTION_ITEMS[i % COLLECTION_ITEMS.length].value;
-  const type = TYPE_ITEMS[i % TYPE_ITEMS.length].value;
-
-  const baseRub = 41800 + i * 3500;
-
-  return {
-    id: String(i + 1),
-    title:
-      category === "bedrooms"
-        ? `Тумба прикроватная ${i + 1}`
-        : category === "living"
-          ? `Витрина ${i + 1}`
-          : category === "youth"
-            ? `Шкаф молодежный ${i + 1}`
-            : category === "hallway"
-              ? `Прихожая модуль ${i + 1}`
-              : `Стол ${i + 1}`,
-
-    price_rub: baseRub,
-    price_uzs: Math.round(baseRub * 140),
-
-    badge: i % 6 === 0 ? "Хит продаж" : i % 9 === 0 ? "Новинка" : "",
-    image: DEMO_IMAGES[i % DEMO_IMAGES.length],
-
-    brand,
-    category,
-
-    menu,
-    collection,
-    type,
-  };
-});
-
-function IconBtn({
-  title,
-  active,
-  danger,
-  success,
-  onClick,
-  children,
-}: {
-  title: string;
-  active?: boolean;
-  danger?: boolean;
-  success?: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      title={title}
-      onClick={onClick}
-      className={cn(
-        "cursor-pointer rounded-full border p-2 backdrop-blur transition",
-        "border-black/10 bg-white/80 hover:bg-white",
-        active &&
-          (danger
-            ? "text-rose-600"
-            : success
-              ? "text-emerald-600"
-              : "text-black"),
-        !active && "text-black/70",
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 function parseCSV(v: string | null) {
   if (!v) return [];
@@ -184,10 +49,10 @@ export default function CatalogClient({
   const sp = useSearchParams();
   const gridRef = useRef<HTMLDivElement | null>(null);
 
-  const { isFav, toggleFav, isInCart, toggleCart } = useShopState();
   const { region } = useRegionLang(); // "uz" | "ru"
-
   const currencyLabel = region === "uz" ? "сум" : "руб.";
+  const currency: "RUB" | "UZS" = region === "ru" ? "RUB" : "UZS";
+
   const fmtPrice = (rub: number, uzs: number) =>
     region === "uz"
       ? `${uzs.toLocaleString("ru-RU")} сум`
@@ -315,7 +180,7 @@ export default function CatalogClient({
       if (price > sidebarValue.priceMax) return false;
 
       if (needle) {
-        const hay = `${p.title} ${p.badge}`.toLowerCase();
+        const hay = `${p.title} ${p.badge ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
 
@@ -347,7 +212,6 @@ export default function CatalogClient({
         arr.sort((a, b) => priceOf(b) - priceOf(a));
         break;
       default:
-        // default = как пришло (для Strapi будет естественный порядок)
         break;
     }
     return arr;
@@ -426,7 +290,7 @@ export default function CatalogClient({
 
         {/* Grid */}
         <section>
-          {/* Верхние фильтры (бренд/категория бренда) */}
+          {/* Верхние фильтры */}
           <div className="mb-4 rounded-2xl border border-black/10 bg-[#F7F5F2] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
             <div className="text-[12px] tracking-[0.18em] uppercase text-black/45">
               Бренды
@@ -517,7 +381,6 @@ export default function CatalogClient({
               </div>
             </div>
 
-            {/* hint line */}
             {(qFromUrl || sort !== "default") && (
               <div className="mt-3 text-[12px] text-black/55">
                 {qFromUrl ? (
@@ -548,8 +411,17 @@ export default function CatalogClient({
             className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
           >
             {sorted.map((p, idx) => {
-              const fav = isFav(p.id);
-              const inCart = isInCart(p.id);
+              const href = `/product/${p.id}`;
+
+              // ✅ snapshot для Supabase wishlist
+              const snapshot = {
+                title: p.title,
+                href,
+                imageUrl: p.image,
+                sku: (p as any).sku ? String((p as any).sku) : null,
+                price_uzs: Number((p as any).price_uzs ?? 0),
+                price_rub: Number((p as any).price_rub ?? 0),
+              };
 
               return (
                 <article
@@ -557,72 +429,66 @@ export default function CatalogClient({
                   data-card
                   className="group overflow-hidden rounded-2xl border border-black/10 bg-[#F7F5F2] shadow-[0_10px_30px_rgba(0,0,0,0.06)]"
                 >
-                  <div className="relative aspect-[4/3] overflow-hidden">
-                    <Image
-                      src={p.image}
-                      alt={p.title}
-                      fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-700 group-hover:scale-[1.05]"
-                      priority={idx < 6}
-                    />
+                  <Link href={href} className="block">
+                    <div className="relative aspect-[4/3] overflow-hidden">
+                      <Image
+                        src={p.image}
+                        alt={p.title}
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-700 group-hover:scale-[1.05]"
+                        priority={idx < 6}
+                      />
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-black/0 to-black/0" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-black/0 to-black/0" />
 
-                    {p.badge ? (
-                      <div className="absolute left-3 top-3 rounded-full border border-white/30 bg-white/80 px-3 py-1 text-[11px] text-black/70 backdrop-blur">
-                        {p.badge}
+                      {p.badge ? (
+                        <div className="absolute left-3 top-3 rounded-full border border-white/30 bg-white/80 px-3 py-1 text-[11px] text-black/70 backdrop-blur">
+                          {p.badge}
+                        </div>
+                      ) : null}
+
+                      {/* ✅ actions: НЕ ломаем клик по карточке */}
+                      <div className="absolute right-3 top-3 z-10 flex translate-y-[-6px] gap-2 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+                        <div
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
+                        >
+                          <ProductActions
+                            id={String(p.id)}
+                            snapshot={snapshot}
+                            onOpenSpecs={() => {
+                              // в каталоге можно просто открыть карточку
+                              window.location.href = href;
+                            }}
+                          />
+                        </div>
                       </div>
-                    ) : null}
+                    </div>
 
-                    <div className="absolute right-3 top-3 flex translate-y-[-6px] gap-2 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                      <IconBtn
-                        title="В избранное"
-                        active={fav}
-                        danger
-                        onClick={() => toggleFav(p.id)}
+                    <div className="p-4">
+                      <div className="text-[14px] font-medium leading-snug text-black/90">
+                        {p.title}
+                      </div>
+
+                      <div className="mt-2 text-[15px] font-semibold text-black">
+                        {fmtPrice(p.price_rub, p.price_uzs)}
+                      </div>
+
+                      {/* CTA ведёт на товар (премиальнее, без дублирования toggleCart) */}
+                      <div
+                        className={cn(
+                          "mt-4 w-full rounded-xl px-4 py-2.5 text-center",
+                          "text-[12px] tracking-[0.16em] uppercase text-white",
+                          "bg-black hover:bg-black/90 transition cursor-pointer",
+                        )}
                       >
-                        <Heart
-                          className={cn("h-4 w-4", fav && "fill-current")}
-                        />
-                      </IconBtn>
-
-                      <IconBtn
-                        title={
-                          inCart ? "Убрать из корзины" : "Добавить в корзину"
-                        }
-                        active={inCart}
-                        success
-                        onClick={() => toggleCart(p.id)}
-                      >
-                        <ShoppingCart
-                          className={cn("h-4 w-4", inCart && "fill-current")}
-                        />
-                      </IconBtn>
+                        Открыть
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="p-4">
-                    <div className="text-[14px] font-medium leading-snug text-black/90">
-                      {p.title}
-                    </div>
-
-                    <div className="mt-2 text-[15px] font-semibold text-black">
-                      {fmtPrice(p.price_rub, p.price_uzs)}
-                    </div>
-
-                    <button
-                      onClick={() => toggleCart(p.id)}
-                      className={cn(
-                        "mt-4 w-full cursor-pointer rounded-xl px-4 py-2.5 text-[12px] tracking-[0.16em] uppercase text-white transition",
-                        inCart
-                          ? "bg-emerald-600 hover:bg-emerald-700"
-                          : "bg-black hover:bg-black/90",
-                      )}
-                    >
-                      {inCart ? "В корзине" : "В корзину"}
-                    </button>
-                  </div>
+                  </Link>
                 </article>
               );
             })}
@@ -634,6 +500,11 @@ export default function CatalogClient({
               фильтров.
             </div>
           ) : null}
+
+          <p className="mt-6 text-xs text-black/45">
+            Валюта: <span className="text-black/70">{currency}</span> • цены
+            пересчитываются по региону
+          </p>
         </section>
       </div>
     </main>

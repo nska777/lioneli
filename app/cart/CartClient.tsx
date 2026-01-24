@@ -7,7 +7,7 @@ import { Trash2, ArrowRight, ShoppingBag } from "lucide-react";
 
 import { useRegionLang } from "../context/region-lang";
 import { useShopState } from "../context/shop-state";
-import { byId } from "../lib/mock/products";
+import { CATALOG_BY_ID, CATALOG_MOCK } from "../lib/mock/catalog-products";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -18,59 +18,7 @@ function formatMoney(n: number, region: "uz" | "ru") {
 }
 
 /**
- * Поддерживаем разные формы cart без гадания:
- * - string[]
- * - Set<string>
- * - Record<string, number> (qty)
- */
-function readCartIds(cart: any): {
-  ids: string[];
-  qtyById: Record<string, number>;
-} {
-  // Record<string, number>
-  if (
-    cart &&
-    typeof cart === "object" &&
-    !Array.isArray(cart) &&
-    !(cart instanceof Set)
-  ) {
-    const entries = Object.entries(cart);
-    if (
-      entries.every(([k, v]) => typeof k === "string" && typeof v === "number")
-    ) {
-      const qtyById: Record<string, number> = {};
-      const ids: string[] = [];
-      for (const [id, qty] of entries) {
-        if (qty > 0) {
-          qtyById[id] = qty;
-          ids.push(id);
-        }
-      }
-      return { ids, qtyById };
-    }
-  }
-
-  // Set<string>
-  if (cart instanceof Set) {
-    const ids = Array.from(cart.values()).map(String);
-    const qtyById = Object.fromEntries(ids.map((id) => [id, 1]));
-    return { ids, qtyById };
-  }
-
-  // string[]
-  if (Array.isArray(cart)) {
-    const ids = cart.map(String);
-    const qtyById = Object.fromEntries(ids.map((id) => [id, 1]));
-    return { ids, qtyById };
-  }
-
-  return { ids: [], qtyById: {} };
-}
-
-/**
- * ✅ Безопасная картинка:
- * если src битый/файла нет — Next/Image может завалить страницу,
- * поэтому ловим ошибку и показываем плейсхолдер.
+ * ✅ Безопасная картинка: если src битый — показываем плейсхолдер
  */
 function SafeImage({ src, alt }: { src: string; alt: string }) {
   const [broken, setBroken] = React.useState(false);
@@ -98,18 +46,22 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
 }
 
 export default function CartClient() {
-  const { region } = useRegionLang(); // ожидаю "uz" | "ru"
-  const shop = useShopState() as any;
+  const { region } = useRegionLang(); // "uz" | "ru"
+  const shop = useShopState(); // ✅ уже типизированный
 
-  const { ids, qtyById } = useMemo(() => readCartIds(shop?.cart), [shop?.cart]);
+  const ids = useMemo(() => {
+    return Object.keys(shop.cart).filter((id) => (shop.cart[id] ?? 0) > 0);
+  }, [shop.cart]);
 
   const items = useMemo(() => {
     return ids
       .map((id) => {
-        const p = byId.get(id);
+        const p = CATALOG_BY_ID.get(id);
         if (!p) return null;
-        const qty = qtyById[id] ?? 1;
-        const unit = region === "uz" ? p.price.uzs : p.price.rub;
+
+        const qty = shop.cart[id] ?? 1;
+        const unit = region === "uz" ? p.price_uzs : p.price_rub;
+
         return {
           id,
           product: p,
@@ -120,12 +72,12 @@ export default function CartClient() {
       })
       .filter(Boolean) as Array<{
       id: string;
-      product: any;
+      product: (typeof CATALOG_MOCK)[number];
       qty: number;
       unit: number;
       sum: number;
     }>;
-  }, [ids, qtyById, region]);
+  }, [ids, shop.cart, region]);
 
   const total = useMemo(
     () => items.reduce((acc, it) => acc + it.sum, 0),
@@ -133,22 +85,16 @@ export default function CartClient() {
   );
 
   const remove = (id: string) => {
-    if (typeof shop?.removeFromCart === "function")
-      return shop.removeFromCart(id);
-    if (typeof shop?.toggleCart === "function") return shop.toggleCart(id);
+    shop.removeFromCart(id);
   };
 
   const clear = () => {
-    if (typeof shop?.clearCart === "function") return shop.clearCart();
-    if (typeof shop?.toggleCart === "function")
-      ids.forEach((id) => shop.toggleCart(id));
+    shop.clearCart();
   };
 
   const changeQty = (id: string, nextQty: number) => {
-    if (nextQty < 1) return;
-    if (typeof shop?.setCartQty === "function")
-      return shop.setCartQty(id, nextQty);
-    if (typeof shop?.setQty === "function") return shop.setQty(id, nextQty);
+    // твой setCartQty уже сам удаляет если qty <= 0
+    shop.setCartQty(id, nextQty);
   };
 
   return (
@@ -213,7 +159,7 @@ export default function CartClient() {
               >
                 <div className="flex gap-4">
                   <Link
-                    href={it.product.href}
+                    href={`/catalog?product=${it.product.id}`}
                     className="cursor-pointer relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-black/5"
                   >
                     <SafeImage src={it.product.image} alt={it.product.title} />
@@ -223,16 +169,14 @@ export default function CartClient() {
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <Link
-                          href={it.product.href}
+                          href={`/catalog?product=${it.product.id}`}
                           className="cursor-pointer block truncate text-base font-medium tracking-[-0.01em] hover:underline"
                         >
                           {it.product.title}
                         </Link>
-                        {it.product.sku && (
-                          <div className="mt-1 text-xs text-black/45">
-                            SKU: {it.product.sku}
-                          </div>
-                        )}
+                        <div className="mt-1 text-xs text-black/45">
+                          ID: {it.product.id}
+                        </div>
                       </div>
 
                       <button
@@ -249,13 +193,7 @@ export default function CartClient() {
                       {/* qty */}
                       <div className="inline-flex items-center rounded-full border border-black/10 bg-white p-1">
                         <button
-                          className={cn(
-                            "cursor-pointer h-9 w-9 rounded-full text-black/70 hover:text-black transition",
-                            !shop?.setCartQty && !shop?.setQty
-                              ? "opacity-40 cursor-not-allowed"
-                              : "",
-                          )}
-                          disabled={!shop?.setCartQty && !shop?.setQty}
+                          className="cursor-pointer h-9 w-9 rounded-full text-black/70 hover:text-black transition"
                           onClick={() => changeQty(it.id, it.qty - 1)}
                         >
                           −
@@ -264,13 +202,7 @@ export default function CartClient() {
                           {it.qty}
                         </div>
                         <button
-                          className={cn(
-                            "cursor-pointer h-9 w-9 rounded-full text-black/70 hover:text-black transition",
-                            !shop?.setCartQty && !shop?.setQty
-                              ? "opacity-40 cursor-not-allowed"
-                              : "",
-                          )}
-                          disabled={!shop?.setCartQty && !shop?.setQty}
+                          className="cursor-pointer h-9 w-9 rounded-full text-black/70 hover:text-black transition"
                           onClick={() => changeQty(it.id, it.qty + 1)}
                         >
                           +

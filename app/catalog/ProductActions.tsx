@@ -1,7 +1,10 @@
 "use client";
 
+import React from "react";
 import { Heart, ShoppingCart, ListChecks } from "lucide-react";
-import { useShopState } from "@/context/shop-state";
+import { useShopState } from "../context/shop-state";
+import { supabase } from "@/app/lib/supabase/client";
+import { wishlistUpsert, wishlistRemove } from "../lib/wishlist";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -38,17 +41,47 @@ function IconBtn({
   );
 }
 
+type WishlistSnapshot = {
+  title?: string | null;
+  href?: string | null;
+  imageUrl?: string | null;
+  sku?: string | null;
+  price_uzs?: number | null;
+  price_rub?: number | null;
+};
+
 export default function ProductActions({
   id,
   onOpenSpecs,
+  snapshot,
 }: {
   id: string;
-  onOpenSpecs?: () => void; // позже: модалка характеристик или сравнение
+  onOpenSpecs?: () => void;
+  snapshot?: WishlistSnapshot; // ✅ передаём из карточки
 }) {
   const { isFav, toggleFav, isInCart, toggleCart } = useShopState();
 
   const fav = isFav(id);
   const inCart = isInCart(id);
+
+  async function toggleFavAndSync() {
+    // каким станет состояние после клика
+    const nextFav = !fav;
+
+    // 1) локально как было
+    toggleFav(id);
+
+    // 2) если не залогинен — ничего не делаем
+    const { data } = await supabase.auth.getSession();
+    if (!data.session) return;
+
+    // 3) синк в Supabase
+    if (nextFav) {
+      await wishlistUpsert(id, snapshot ?? {});
+    } else {
+      await wishlistRemove(id);
+    }
+  }
 
   return (
     <div className="flex gap-2">
@@ -57,12 +90,12 @@ export default function ProductActions({
         title="В избранное"
         active={fav}
         tone="danger"
-        onClick={() => toggleFav(id)}
+        onClick={toggleFavAndSync}
       >
         <Heart className={cn("h-4 w-4", fav && "fill-current")} />
       </IconBtn>
 
-      {/* 🧾 характеристики / сравнение */}
+      {/* 🧾 характеристики */}
       <IconBtn title="Характеристики" onClick={() => onOpenSpecs?.()}>
         <ListChecks className="h-4 w-4" />
       </IconBtn>

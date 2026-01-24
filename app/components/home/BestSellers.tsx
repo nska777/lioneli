@@ -5,30 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Heart,
-  ShoppingCart,
-  ListChecks,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
-import { useRegionLang } from "../../context/region-lang";
-import { useShopState } from "../../context/shop-state";
+import { useRegionLang } from "@/app/context/region-lang";
+import ProductActions from "@/app/catalog/ProductActions"; // ⚠️ поправь путь если надо
+import { CATALOG_MOCK } from "@/app/lib/mock/catalog-products"; // ⚠️ поправь путь если надо
 
 gsap.registerPlugin(ScrollTrigger);
-
-type PriceByRegion = { rub: number; uzs: number };
-
-type Product = {
-  id: string;
-  title: string;
-  image: string;
-  href: string;
-  badge?: string;
-  sku?: string;
-  price: PriceByRegion;
-};
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -48,63 +31,24 @@ function formatPrice(value: number, currency: "RUB" | "UZS") {
   }
 }
 
+type HitUIItem = {
+  id: string;
+  title: string;
+  href: string;
+  image: string;
+  price_rub: number;
+  price_uzs: number;
+  badge: string; // ✅ всегда “Хит продаж”
+  skuLabel?: string; // если хочешь оставить, можно не показывать
+};
+
 export default function BestSellers({
   title = "Хит продаж",
-  products = [
-    {
-      id: "p1",
-      badge: "Хит продаж",
-      image: "/products/1.jpg",
-      title: "Тумба прикроватная ширина 500 мм Modena",
-      sku: "Арт. T6062",
-      href: "/product/modena-500",
-      price: { rub: 41800, uzs: 5900000 },
-    },
-    {
-      id: "p2",
-      badge: "Хит продаж",
-      image: "/products/2.jpg",
-      title: "Тумба прикроватная Makassar Дуб капучино",
-      sku: "Арт. MR701/D",
-      href: "/product/makassar-dub",
-      price: { rub: 49900, uzs: 7100000 },
-    },
-    {
-      id: "p3",
-      badge: "Хит продаж",
-      image: "/products/3.jpg",
-      title: "Тумба прикроватная Makassar",
-      sku: "Арт. MR701",
-      href: "/product/makassar",
-      price: { rub: 58700, uzs: 8350000 },
-    },
-    {
-      id: "p4",
-      badge: "Хит продаж",
-      image: "/products/4.jpg",
-      title: "Комод 3 с 3-мя ящиками и 2-мя дверями Modena",
-      sku: "Арт. K603",
-      href: "/product/komod-modena",
-      price: { rub: 139800, uzs: 19900000 },
-    },
-    {
-      id: "p5",
-      badge: "Хит продаж",
-      image: "/products/5.jpg",
-      title: "Кровать Makassar (комплект)",
-      sku: "Арт. MK100",
-      href: "/product/bed-makassar",
-      price: { rub: 189900, uzs: 27000000 },
-    },
-  ] as Product[],
 }: {
   title?: string;
-  products?: Product[];
 }) {
   const { region } = useRegionLang();
   const currency: "RUB" | "UZS" = region === "ru" ? "RUB" : "UZS";
-
-  const { isFav, toggleFav, isInCart, toggleCart } = useShopState();
 
   const rootRef = useRef<HTMLElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -117,38 +61,43 @@ export default function BestSellers({
     return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   }, []);
 
-  // ✅ pop helper (сердце)
-  const pop = (el: HTMLElement, kind: "on" | "off" = "on") => {
-    if (reducedMotion) return;
-    gsap.killTweensOf(el);
-    gsap.set(el, { transformOrigin: "50% 50%" });
+  // ✅ гарантируем, что слайдер всегда работает (>= 12)
+  const list = useMemo<HitUIItem[]>(() => {
+    const all = (CATALOG_MOCK ?? []) as any[];
 
-    const amp = kind === "on" ? 1.24 : 1.14;
-    const rot = kind === "on" ? -10 : 6;
+    const isHit = (p: any) => {
+      const b = String(p.badge || "").toLowerCase();
+      return b.includes("хит") || b.includes("bestseller");
+    };
 
-    gsap.fromTo(
-      el,
-      { scale: 1, rotate: 0 },
-      {
-        scale: amp,
-        rotate: rot,
-        duration: 0.18,
-        ease: "power3.out",
-        yoyo: true,
-        repeat: 1,
-        onComplete: () => gsap.set(el, { rotate: 0, scale: 1 }),
-      },
-    );
-  };
+    const hits = all.filter(isHit);
+    const need = 12;
 
-  // ✅ Расчёт страниц
+    const used = new Set(hits.map((p: any) => String(p.id)));
+    const extra = all.filter((p: any) => !used.has(String(p.id)));
+
+    const merged = [...hits, ...extra].slice(0, Math.min(need, all.length));
+
+    return merged.map((p: any) => ({
+      id: String(p.id),
+      title: p.title,
+      href: `/product/${p.id}`,
+      image: p.image,
+      price_rub: Number(p.price_rub ?? 0),
+      price_uzs: Number(p.price_uzs ?? 0),
+      badge: "Хит продаж", // ✅ ВЕЗДЕ
+      skuLabel: `ID: ${p.id}`,
+    }));
+  }, []);
+
+  // ✅ pages
   useLayoutEffect(() => {
     if (!rootRef.current) return;
 
     const calcPages = () => {
       const w = window.innerWidth;
       const perView = w >= 1024 ? 4 : w >= 768 ? 2 : 1;
-      const newPages = Math.max(1, Math.ceil(products.length / perView));
+      const newPages = Math.max(1, Math.ceil(list.length / perView));
       setPages(newPages);
       setPage((p) => Math.min(p, newPages - 1));
     };
@@ -156,9 +105,9 @@ export default function BestSellers({
     calcPages();
     window.addEventListener("resize", calcPages);
     return () => window.removeEventListener("resize", calcPages);
-  }, [products.length]);
+  }, [list.length]);
 
-  // ✅ Перелистывание трека
+  // ✅ slide
   useLayoutEffect(() => {
     if (!rootRef.current || !trackRef.current) return;
 
@@ -171,6 +120,7 @@ export default function BestSellers({
     const cw = card.getBoundingClientRect().width;
     const perView =
       window.innerWidth >= 1024 ? 4 : window.innerWidth >= 768 ? 2 : 1;
+
     const shift = page * perView * (cw + gap);
 
     if (reducedMotion) {
@@ -179,9 +129,9 @@ export default function BestSellers({
     }
 
     gsap.to(trackRef.current, { x: -shift, duration: 0.9, ease: "expo.out" });
-  }, [page, reducedMotion]);
+  }, [page, reducedMotion, list.length]);
 
-  // ✅ GSAP hover actions show/hide (иконки только при наведении)
+  // ✅ hover actions show/hide
   useLayoutEffect(() => {
     if (!rootRef.current) return;
 
@@ -246,9 +196,9 @@ export default function BestSellers({
     });
 
     return () => cleanups.forEach((fn) => fn());
-  }, [products.length, reducedMotion]);
+  }, [list.length, reducedMotion]);
 
-  // ✅ ПРЕМИАЛЬНОЕ ПОЯВЛЕНИЕ ВСЕГО БЛОКА (wind + blur + clip)
+  // ✅ reveal
   useLayoutEffect(() => {
     if (!rootRef.current) return;
     if (reducedMotion) return;
@@ -271,14 +221,9 @@ export default function BestSellers({
     ) as HTMLElement[];
 
     const tl = gsap.timeline({
-      scrollTrigger: {
-        trigger: root,
-        start: "top 78%",
-        once: true,
-      },
+      scrollTrigger: { trigger: root, start: "top 78%", once: true },
     });
 
-    // initial states
     if (header) gsap.set(header, { autoAlpha: 0, y: 18, filter: "blur(10px)" });
     if (viewport)
       gsap.set(viewport, {
@@ -289,21 +234,11 @@ export default function BestSellers({
       });
     if (dots) gsap.set(dots, { autoAlpha: 0, y: 10, filter: "blur(8px)" });
     if (wind) gsap.set(wind, { xPercent: -140, autoAlpha: 0 });
+    if (cards.length) gsap.set(cards, { y: 10, filter: "blur(6px)" });
 
-    // cards subtle lift
-    if (cards.length) {
-      gsap.set(cards, { y: 10, filter: "blur(6px)" });
-    }
-
-    // timeline
     tl.to(
       wind,
-      {
-        autoAlpha: 1,
-        xPercent: 140,
-        duration: 0.85,
-        ease: "expo.out",
-      },
+      { autoAlpha: 1, xPercent: 140, duration: 0.85, ease: "expo.out" },
       0,
     )
       .to(
@@ -355,18 +290,17 @@ export default function BestSellers({
     return () => {
       tl.kill();
       ScrollTrigger.getAll().forEach((st) => {
-        // не убиваем чужие триггеры — только этот, если он есть
         if (st.trigger === root) st.kill();
       });
     };
-  }, [reducedMotion, products.length]);
+  }, [reducedMotion, list.length]);
 
   const prev = () => setPage((p) => Math.max(0, p - 1));
   const next = () => setPage((p) => Math.min(pages - 1, p + 1));
 
   return (
     <section ref={rootRef} className="w-full bg-white relative overflow-hidden">
-      {/* wind layer */}
+      {/* wind */}
       <div
         data-wind
         className="pointer-events-none absolute inset-y-0 -left-[40%] w-[180%]"
@@ -427,7 +361,6 @@ export default function BestSellers({
         {/* viewport */}
         <div
           data-reveal="viewport"
-          data-viewport
           className={cn("mt-8 overflow-hidden", "pr-0 lg:pr-[110px]")}
         >
           <div
@@ -435,14 +368,22 @@ export default function BestSellers({
             className="flex gap-6 will-change-transform"
             style={{ transform: "translateZ(0)" }}
           >
-            {products.map((p) => {
-              const value = currency === "RUB" ? p.price.rub : p.price.uzs;
-              const fav = isFav(p.id);
-              const inCart = isInCart(p.id);
+            {list.map((p, idx) => {
+              const value = currency === "RUB" ? p.price_rub : p.price_uzs;
+
+              // ✅ snapshot для wishlist
+              const snapshot = {
+                title: p.title,
+                href: p.href,
+                imageUrl: p.image,
+                sku: p.skuLabel ?? null,
+                price_uzs: p.price_uzs,
+                price_rub: p.price_rub,
+              };
 
               return (
                 <Link
-                  key={p.id}
+                  key={`${p.id}-${idx}`}
                   href={p.href}
                   data-card
                   className={cn(
@@ -460,110 +401,38 @@ export default function BestSellers({
                     )}
                   >
                     <div className="relative overflow-hidden rounded-t-[22px]">
-                      {p.badge ? (
-                        <div className="absolute left-2 top-2 z-10">
-                          <span
-                            className={cn(
-                              "inline-flex items-center",
-                              "h-7 px-3 rounded-[12px]",
-                              "bg-white/88 backdrop-blur-xl",
-                              "border border-amber-400/70",
-                              "text-[12px] font-medium text-amber-700",
-                              "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
-                            )}
-                          >
-                            {p.badge}
-                          </span>
-                        </div>
-                      ) : null}
+                      {/* ✅ badge — всегда */}
+                      <div className="absolute left-2 top-2 z-10">
+                        <span
+                          className={cn(
+                            "inline-flex items-center",
+                            "h-7 px-3 rounded-[12px]",
+                            "bg-white/88 backdrop-blur-xl",
+                            "border border-amber-400/70",
+                            "text-[12px] font-medium text-amber-700",
+                            "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
+                          )}
+                        >
+                          {p.badge}
+                        </span>
+                      </div>
 
-                      {/* actions show only on hover (GSAP) */}
+                      {/* ✅ actions via ProductActions */}
                       <div
                         data-actions
-                        className="absolute right-2 top-2 z-10 flex flex-col gap-2"
+                        className="absolute right-2 top-2 z-10"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
                       >
-                        {/* FAVORITE + POP */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-
-                            const svg = (e.currentTarget.querySelector("svg") ||
-                              e.currentTarget) as HTMLElement;
-
-                            const wasFav = fav;
-                            pop(svg, wasFav ? "off" : "on");
-                            toggleFav(p.id);
+                        <ProductActions
+                          id={p.id}
+                          snapshot={snapshot}
+                          onOpenSpecs={() => {
+                            window.location.href = p.href;
                           }}
-                          className={cn(
-                            "h-9 w-9 rounded-full grid place-items-center",
-                            "bg-white/88 backdrop-blur-xl",
-                            "border border-black/10",
-                            "shadow-[0_14px_40px_rgba(0,0,0,0.16)]",
-                            "cursor-pointer transition",
-                          )}
-                          aria-label={
-                            fav ? "Убрать из избранного" : "В избранное"
-                          }
-                        >
-                          <Heart
-                            className={cn(
-                              "h-4 w-4 transition",
-                              fav
-                                ? "text-rose-500 fill-rose-500"
-                                : "text-black/70",
-                            )}
-                          />
-                        </button>
-
-                        {/* CART toggle */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            toggleCart(p.id);
-                          }}
-                          className={cn(
-                            "h-9 w-9 rounded-full grid place-items-center",
-                            "bg-white/88 backdrop-blur-xl",
-                            "border border-black/10",
-                            "shadow-[0_14px_40px_rgba(0,0,0,0.16)]",
-                            "cursor-pointer transition",
-                            inCart ? "ring-1 ring-emerald-500/40" : "",
-                          )}
-                          aria-label={
-                            inCart ? "Убрать из корзины" : "Добавить в корзину"
-                          }
-                        >
-                          <ShoppingCart
-                            className={cn(
-                              "h-4 w-4 transition",
-                              inCart ? "text-emerald-600" : "text-black/70",
-                            )}
-                          />
-                        </button>
-
-                        {/* SPECS */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            alert("Скоро: характеристики и быстрый просмотр");
-                          }}
-                          className={cn(
-                            "h-9 w-9 rounded-full grid place-items-center",
-                            "bg-white/88 backdrop-blur-xl",
-                            "border border-black/10",
-                            "shadow-[0_14px_40px_rgba(0,0,0,0.16)]",
-                            "cursor-pointer transition",
-                          )}
-                          aria-label="Характеристики"
-                        >
-                          <ListChecks className="h-4 w-4 text-black/70" />
-                        </button>
+                        />
                       </div>
 
                       <div className="relative aspect-[4/3] bg-black/[0.02] flex-shrink-0">
@@ -572,6 +441,7 @@ export default function BestSellers({
                           alt={p.title}
                           fill
                           className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                          priority={idx < 6}
                         />
                         <div
                           className="pointer-events-none absolute inset-x-0 bottom-0 h-20"
@@ -594,15 +464,8 @@ export default function BestSellers({
                         </div>
                       </div>
 
-                      {p.sku ? (
-                        <div className="mt-2 text-[12px] text-black/35">
-                          {p.sku}
-                        </div>
-                      ) : (
-                        <div className="mt-2 text-[12px] text-transparent">
-                          —
-                        </div>
-                      )}
+                      {/* ✅ визуально убрано ID (как ты хотел позже) */}
+                      <div className="mt-2 text-[12px] text-transparent">—</div>
                     </div>
                   </div>
                 </Link>
