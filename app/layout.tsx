@@ -7,11 +7,10 @@ import { RegionLangProvider } from "./context/region-lang";
 import { ShopStateProvider } from "./context/shop-state";
 import BackToTop from "./components/ui/BackToTop";
 
-// ✅ вынесли сюда
 import Header from "./components/Header";
 import Footer from "./components/sections/Footer";
 
-// import SmoothWheelScroll from "./components/providers/SmoothWheelScroll";
+import { getGlobal } from "./lib/strapi";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,33 +27,27 @@ export const metadata: Metadata = {
   description: "Lioneto furniture",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // ✅ тянем глобальные данные из Strapi один раз для шапки
+  const global = await getGlobal();
+
   return (
     <html lang="ru">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white text-black`}
       >
-        {/* Плавность колёсика/тачпада по всему сайту */}
-        {/* <SmoothWheelScroll duration={140} wheelMultiplier={1} maxStep={220} /> */}
-
         <RegionLangProvider>
           <ShopStateProvider>
-            {/* ✅ шапка всегда */}
-            <Header />
-
-            {/* ✅ меняется только контент страницы */}
+            <Header global={global} />
             {children}
-
-            {/* ✅ футер всегда */}
             <Footer />
           </ShopStateProvider>
         </RegionLangProvider>
 
-        {/* Глобальная кнопка */}
         <BackToTop />
       </body>
     </html>

@@ -1,77 +1,69 @@
 export default {
-  header: {
-    pickRegion: "HUDUDNI TANLANG",
+  common: {
+    inDev: "Ishlab chiqilmoqda",
+  },
+   header: {
+    pickRegion: "Hududni tanlang",
     regionUz: "O‘zbekiston",
     regionRu: "Rossiya",
-
     ariaSearch: "Qidiruv",
-    ariaAccount: "Shaxsiy kabinet",
+    ariaAccount: "Kabinet",
     ariaFavorites: "Sevimlilar",
     ariaCart: "Savat",
+  },  
+  region: {
+    uz: "O‘zbekiston",
+    ru: "Rossiya",
   },
-  nav: {
-    catalog: "Katalog",
-    about: "Kompaniya haqida",
-    news: "Yangiliklar",
-    contacts: "Kontaktlar",
-    cooperation: "Hamkorlik",
-    sale: "Aksiyalar",
+  header: {
+    top: {
+      catalog: "Katalog",
+      about: "Kompaniya haqida",
+      news: "Yangiliklar",
+      contacts: "Kontaktlar",
+      cooperation: "Hamkorlik",
+      sale: "Aksiyalar",
+    },
+    mega: {
+      bedrooms: "YOTOQ XONALAR",
+      living: "MEHMONXONALAR",
+      youth: "YOSHLAR UCHUN",
+      hallway: "KIRISH YO‘LAKLARI",
+      tables: "STOL VA STULLAR",
+    },
+    
   },
-
+  
+  brand: {
+    amber: "AMBER",
+    scandi: "SCANDI",
+    elizabeth: "ELIZABETH",
+    salvador: "SALVADOR",
+    pitti: "PITTI",
+    pitti_alt: "PATTI",
+    buongiorno: "BUONGIORNO",
+    bergen_white: "BERGEN WHITE",
+  },
   mega: {
-    bedrooms: { title: "YOTOQ XONALAR" },
-    living: { title: "MEHMONXONALAR" },
-    youth: { title: "YOSHLAR UCHUN" },
-    hallway: { title: "KIRISH XONASI" },
-    tablesChairs: { title: "STOL VA STULLAR" },
-
-    collections: {
-      amber: "AMBER",
-      scandi: "SCANDI",
-      elizabeth: "ELIZABETH",
-      salvador: "SALVADOR",
-      pitti: "PITTI",
-      pitti_alt: "PATTI",
-      buongiorno: "BUONGIORNO",
-      bergen_white: "BERGEN WHITE",
-    },
-
-    common: {
-      inProgress: "ISHLAB CHIQILMOQDA",
-    },
-
     preview: {
       bedrooms: {
-        amber: "Yotoqxona «AMBER»",
-        scandi: "Yotoqxona «SCANDI»",
-        elizabeth: "Yotoqxona «ELIZABETH»",
-        salvador: "Yotoqxona «SALVADOR»",
-        pitti: "Yotoqxona «PITTI»",
-        buongiorno: "Yotoqxona «BUONGIORNO»",
+        amber: "«AMBER» yotoq xonasi",
+        scandi: "«SCANDI» yotoq xonasi",
+        elizabeth: "«ELIZABETH» yotoq xonasi",
+        salvador: "«SALVADOR» yotoq xonasi",
+        pitti: "«PITTI» yotoq xonasi",
+        buongiorno: "«BUONGIORNO» yotoq xonasi",
       },
       living: {
-        scandi: "Mehmonxona «SCANDI»",
-        pitti: "Mehmonxona «PATTI»",
-        salvador: "Mehmonxona «SALVADOR»",
-        bergenWhite: "Mehmonxona «BERGEN WHITE»",
+        scandi: "«SCANDI» mehmonxonasi",
+        pitti: "«PATTI» mehmonxonasi",
+        salvador: "«SALVADOR» mehmonxonasi",
+        bergenWhite: "«BERGEN WHITE» mehmonxonasi",
       },
       youth: {
-        scandi: "Yoshlar uchun «SCANDI»",
-        elizabeth: "Yoshlar uchun «ELIZABETH»",
+        scandi: "«SCANDI» yoshlar xonasi",
+        elizabeth: "«ELIZABETH» yoshlar xonasi",
       },
     },
   },
-
-  region: {
-    uz: {
-      label: "O‘zbekiston",
-      addr1: "Rich House Mirzo-Ulug‘bek, 18",
-    },
-    ru: {
-      label: "Rossiya",
-      addr1: "Moskva, Tverskaya 12",
-      addr2: "Moskva, Leningradskiy prospekt 45",
-      addr3: "Sankt-Peterburg, Nevskiy prospekt 28",
-    },
-  },
-} as const;
+};

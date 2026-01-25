@@ -7,7 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { supabase } from "@/app/lib/supabase/client";
-import { getDict, t as tByKey } from "@/i18n";
+import { getDict, tF } from "@/i18n";
 
 function IconBtn({
   label,
@@ -23,7 +23,6 @@ function IconBtn({
   const base =
     "relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-black/60 hover:bg-black/5 hover:text-black transition";
 
-  // ✅ если передали href — это ссылка
   if (href) {
     return (
       <Link aria-label={label} href={href} className={base}>
@@ -32,7 +31,6 @@ function IconBtn({
     );
   }
 
-  // ✅ иначе — кнопка
   return (
     <button type="button" aria-label={label} onClick={onClick} className={base}>
       {children}
@@ -54,7 +52,7 @@ export default function BrandRow({
   const { favCount, cartCount } = useShopState();
 
   const dict = useMemo(() => getDict(lang), [lang]);
-  const t = (key: string) => tByKey(dict, key);
+  const tt = (key: string, fallback: string) => tF(dict, key, fallback);
 
   // ✅ ACCOUNT LINK: если есть сессия → /account, иначе → /auth?next=/account
   const [accountHref, setAccountHref] = useState("/auth?next=/account");
@@ -84,7 +82,7 @@ export default function BrandRow({
           {/* LEFT: REGION */}
           <div className="flex items-center justify-between md:w-[360px] md:justify-start md:gap-4">
             <div className="text-[11px] md:text-[12px] tracking-[0.20em] text-black/45">
-              {t("header.pickRegion")}
+              {tt("header.pickRegion", "Выберите регион")}
             </div>
 
             <div className="inline-flex rounded-full border border-black/10 bg-white p-1 shadow-sm">
@@ -98,7 +96,7 @@ export default function BrandRow({
                     : "text-black/70 hover:text-black hover:bg-black/5",
                 ].join(" ")}
               >
-                {t("header.regionUz")}
+                {tt("header.regionUz", "Узбекистан")}
               </button>
 
               <button
@@ -111,7 +109,7 @@ export default function BrandRow({
                     : "text-black/70 hover:text-black hover:bg-black/5",
                 ].join(" ")}
               >
-                {t("header.regionRu")}
+                {tt("header.regionRu", "Россия")}
               </button>
             </div>
           </div>
@@ -165,7 +163,7 @@ export default function BrandRow({
 
             {/* SEARCH */}
             <IconBtn
-              label={t("header.ariaSearch")}
+              label={tt("header.ariaSearch", "Поиск")}
               onClick={() => {
                 // позже: открыть модалку поиска
               }}
@@ -174,13 +172,19 @@ export default function BrandRow({
             </IconBtn>
 
             {/* ACCOUNT */}
-            <IconBtn label={t("header.ariaAccount")} href={accountHref}>
+            <IconBtn
+              label={tt("header.ariaAccount", "Кабинет")}
+              href={accountHref}
+            >
               <User className="h-5 w-5" />
             </IconBtn>
 
             {/* FAVORITES */}
             <div className="relative">
-              <IconBtn label={t("header.ariaFavorites")} href="/favorites">
+              <IconBtn
+                label={tt("header.ariaFavorites", "Избранное")}
+                href="/favorites"
+              >
                 <Heart className="h-5 w-5" />
               </IconBtn>
 
@@ -193,7 +197,7 @@ export default function BrandRow({
 
             {/* CART */}
             <div className="relative">
-              <IconBtn label={t("header.ariaCart")} href="/cart">
+              <IconBtn label={tt("header.ariaCart", "Корзина")} href="/cart">
                 <ShoppingCart className="h-5 w-5" />
               </IconBtn>
 

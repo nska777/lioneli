@@ -20,10 +20,12 @@ function TopLink({
   href,
   children,
   active,
+  external,
 }: {
   href: string;
   children: React.ReactNode;
   active: boolean;
+  external?: boolean;
 }) {
   const rootRef = useRef<HTMLAnchorElement | null>(null);
   const lineRef = useRef<HTMLSpanElement | null>(null);
@@ -33,7 +35,6 @@ function TopLink({
     const line = lineRef.current;
     if (!root || !line) return;
 
-    // старт
     gsap.set(line, {
       scaleX: active ? 1 : 0,
       opacity: active ? 1 : 0,
@@ -72,30 +73,41 @@ function TopLink({
     };
   }, [active]);
 
-  return (
-    <Link
-      ref={rootRef}
-      href={href}
-      className={cn(
-        "relative cursor-pointer select-none transition-colors",
-        "text-[13px] tracking-[0.02em]",
-        active ? "text-black" : "text-black/70 hover:text-black",
-      )}
-    >
-      {children}
+  const klass = cn(
+    "relative cursor-pointer select-none transition-colors",
+    "text-[13px] tracking-[0.02em]",
+    active ? "text-black" : "text-black/70 hover:text-black",
+  );
 
-      {/* underline */}
-      <span
-        ref={lineRef}
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute left-0 -bottom-[0.75px] w-full rounded-full",
-          active ? "h-[0.75px]" : "h-[0.75px]",
-        )}
-        style={{
-          background: "rgba(0,0,0,0.65)",
-        }}
-      />
+  const underline = (
+    <span
+      ref={lineRef}
+      aria-hidden
+      className="pointer-events-none absolute left-0 -bottom-[0.75px] w-full rounded-full h-[0.75px]"
+      style={{ background: "rgba(0,0,0,0.65)" }}
+    />
+  );
+
+  // external
+  if (external) {
+    return (
+      <a
+        ref={rootRef}
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className={klass}
+      >
+        {children}
+        {underline}
+      </a>
+    );
+  }
+
+  return (
+    <Link ref={rootRef} href={href} className={klass}>
+      {children}
+      {underline}
     </Link>
   );
 }
@@ -105,14 +117,16 @@ export default function TopBar({
   phone,
   regionTitle,
   addresses,
+  callCtaLabel = "Заказать звонок",
   onPickAddress,
   onOpenCall,
   onOpenMobileMenu,
 }: {
-  topLinks: readonly { label: string; href: string }[];
+  topLinks: readonly { label: string; href: string; isExternal?: boolean }[];
   phone: string;
   regionTitle: string;
   addresses: string[];
+  callCtaLabel?: string;
   onPickAddress: (address: string) => void;
   onOpenCall: () => void;
   onOpenMobileMenu: () => void;
@@ -129,7 +143,8 @@ export default function TopBar({
               <TopLink
                 key={l.href}
                 href={l.href}
-                active={isActive(pathname, l.href)}
+                active={!l.isExternal && isActive(pathname, l.href)}
+                external={l.isExternal}
               >
                 {l.label}
               </TopLink>
@@ -142,6 +157,7 @@ export default function TopBar({
               className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full hover:bg-black/5 transition"
               onClick={onOpenMobileMenu}
               aria-label="Menu"
+              type="button"
             >
               <Menu className="h-5 w-5 text-black/70" />
             </button>
@@ -165,7 +181,7 @@ export default function TopBar({
               </a>
             </div>
 
-            <CallButton onClick={onOpenCall} />
+            <CallButton label={callCtaLabel} onClick={onOpenCall} />
           </div>
         </div>
       </div>

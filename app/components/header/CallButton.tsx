@@ -5,10 +5,13 @@ import gsap from "gsap";
 
 export default function CallButton({
   onClick,
-  children = "Заказать звонок",
+  children,
+  label = "Заказать звонок",
 }: {
   onClick: () => void;
   children?: React.ReactNode;
+  // ✅ из Strapi будем передавать сюда
+  label?: string;
 }) {
   const rootRef = useRef<HTMLButtonElement | null>(null);
 
@@ -96,6 +99,9 @@ export default function CallButton({
     return () => ctx.revert();
   }, []);
 
+  // ✅ текст кнопки: children > label > fallback
+  const text = children ?? label;
+
   return (
     <button
       ref={rootRef}
@@ -124,7 +130,6 @@ export default function CallButton({
           // чуть более тёплый/контрастный оттенок + легкий “сияющий” центр
           background:
             "radial-gradient(120% 140% at 20% 0%, rgba(255,248,220,0.55), rgba(255,255,255,0) 55%), linear-gradient(180deg, #f6e6b8 0%, #e8c97a 45%, #d9b45f 100%)",
-
           mixBlendMode: "multiply",
         }}
       />
@@ -187,7 +192,7 @@ export default function CallButton({
             "linear-gradient(90deg, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.62) 45%, rgba(0,0,0,0.78) 100%)",
         }}
       >
-        {children}
+        {text}
       </span>
     </button>
   );

@@ -1,6 +1,6 @@
 // app/lib/headerData.ts
 
-export type MegaItem = { label: string; href: string };
+export type MegaItem = { labelKey: string; fallback: string; href: string };
 
 export type MegaKey =
   | "bedrooms"
@@ -12,18 +12,25 @@ export type MegaKey =
 
 export type MegaCategory = {
   key: MegaKey;
-  label: string;
+  labelKey: string;
+  fallback: string;
   href: string;
   items: MegaItem[];
 };
 
-export const topLinks = [
-  { label: "Каталог", href: "/catalog" },
-  { label: "О компании", href: "/about" },
-  { label: "Новости", href: "/news" },
-  { label: "Контакты", href: "/contacts" },
-  { label: "Сотрудничество", href: "/cooperation" },
-  { label: "Акции", href: "/sale" },
+export type TopLink = { labelKey: string; fallback: string; href: string };
+
+export const topLinks: readonly TopLink[] = [
+  { labelKey: "header.top.catalog", fallback: "Каталог", href: "/catalog" },
+  { labelKey: "header.top.about", fallback: "О компании", href: "/about" },
+  { labelKey: "header.top.news", fallback: "Новости", href: "/news" },
+  { labelKey: "header.top.contacts", fallback: "Контакты", href: "/contacts" },
+  {
+    labelKey: "header.top.cooperation",
+    fallback: "Сотрудничество",
+    href: "/cooperation",
+  },
+  { labelKey: "header.top.sale", fallback: "Акции", href: "/sale" },
 ] as const;
 
 /**
@@ -57,49 +64,113 @@ export function parseCollectionHref(href: string) {
 export const megaCategories: MegaCategory[] = [
   {
     key: "bedrooms",
-    label: "СПАЛЬНИ",
+    labelKey: "header.mega.bedrooms",
+    fallback: "СПАЛЬНИ",
     href: "/category/bedrooms",
     items: [
-      { label: "АМБЕР", href: makeCollectionHref("amber", "bedrooms") },
-      { label: "СКАНДИ", href: makeCollectionHref("scandi", "bedrooms") },
-      { label: "ЭЛИЗАБЕТ", href: makeCollectionHref("elizabeth", "bedrooms") },
-      { label: "САЛЬВАДОР", href: makeCollectionHref("salvador", "bedrooms") },
-      { label: "ПИТТИ", href: makeCollectionHref("pitti", "bedrooms") },
-      // ✅ важно: buongiorno везде одинаково
-      { label: "БОНЖОРНО", href: makeCollectionHref("buongiorno", "bedrooms") },
+      {
+        labelKey: "brand.amber",
+        fallback: "АМБЕР",
+        href: makeCollectionHref("amber", "bedrooms"),
+      },
+      {
+        labelKey: "brand.scandi",
+        fallback: "СКАНДИ",
+        href: makeCollectionHref("scandi", "bedrooms"),
+      },
+      {
+        labelKey: "brand.elizabeth",
+        fallback: "ЭЛИЗАБЕТ",
+        href: makeCollectionHref("elizabeth", "bedrooms"),
+      },
+      {
+        labelKey: "brand.salvador",
+        fallback: "САЛЬВАДОР",
+        href: makeCollectionHref("salvador", "bedrooms"),
+      },
+      {
+        labelKey: "brand.pitti",
+        fallback: "ПИТТИ",
+        href: makeCollectionHref("pitti", "bedrooms"),
+      },
+      {
+        labelKey: "brand.buongiorno",
+        fallback: "БОНЖОРНО",
+        href: makeCollectionHref("buongiorno", "bedrooms"),
+      },
     ],
   },
   {
     key: "living",
-    label: "ГОСТИНЫЕ",
+    labelKey: "header.mega.living",
+    fallback: "ГОСТИНЫЕ",
     href: "/category/living",
     items: [
-      { label: "СКАНДИ", href: makeCollectionHref("scandi", "living") },
-      { label: "ПАТТИ", href: makeCollectionHref("pitti", "living") },
-      { label: "САЛЬВАДОР", href: makeCollectionHref("salvador", "living") },
-      { label: "BERGEN WHITE", href: makeCollectionHref("buongiorno", "living") },
+      {
+        labelKey: "brand.scandi",
+        fallback: "СКАНДИ",
+        href: makeCollectionHref("scandi", "living"),
+      },
+      {
+        labelKey: "brand.pitti_alt",
+        fallback: "ПАТТИ",
+        href: makeCollectionHref("pitti", "living"),
+      },
+      {
+        labelKey: "brand.salvador",
+        fallback: "САЛЬВАДОР",
+        href: makeCollectionHref("salvador", "living"),
+      },
+      {
+        labelKey: "brand.bergen_white",
+        fallback: "BERGEN WHITE",
+        href: makeCollectionHref("buongiorno", "living"),
+      },
     ],
   },
   {
     key: "hallway",
-    label: "МОЛОДЕЖНЫЕ",
+    labelKey: "header.mega.youth",
+    fallback: "МОЛОДЕЖНЫЕ",
     href: "/category/youth",
     items: [
-      { label: "СКАНДИ", href: makeCollectionHref("scandi", "youth") },
-      { label: "ЭЛИЗАБЕТ", href: makeCollectionHref("elizabeth", "youth") },
+      {
+        labelKey: "brand.scandi",
+        fallback: "СКАНДИ",
+        href: makeCollectionHref("scandi", "youth"),
+      },
+      {
+        labelKey: "brand.elizabeth",
+        fallback: "ЭЛИЗАБЕТ",
+        href: makeCollectionHref("elizabeth", "youth"),
+      },
     ],
   },
   {
     key: "office",
-    label: "ПРИХОЖИЕ",
+    labelKey: "header.mega.hallway",
+    fallback: "ПРИХОЖИЕ",
     href: "/category/office",
-    items: [{ label: "В РАЗРАБОТКЕ", href: "/category/office" }],
+    items: [
+      {
+        labelKey: "common.inDev",
+        fallback: "В РАЗРАБОТКЕ",
+        href: "/category/office",
+      },
+    ],
   },
   {
     key: "wardrobes",
-    label: "СТОЛЫ И СТУЛЬЯ",
+    labelKey: "header.mega.tables",
+    fallback: "СТОЛЫ И СТУЛЬЯ",
     href: "/category/wardrobes",
-    items: [{ label: "В РАЗРАБОТКЕ", href: "/catalog/bryce" }],
+    items: [
+      {
+        labelKey: "common.inDev",
+        fallback: "В РАЗРАБОТКЕ",
+        href: "/catalog/bryce",
+      },
+    ],
   },
 ];
 
@@ -109,46 +180,53 @@ export const megaCategories: MegaCategory[] = [
 ========================= */
 
 export type MegaPreview = {
-  title: string; // подпись на большой фотке
-  main: string; // большая
-  a: string; // маленькая 1
-  b: string; // маленькая 2
+  titleKey: string;
+  fallback: string;
+  main: string;
+  a: string;
+  b: string;
 };
 
 export const MEGA_PREVIEWS: Record<string, MegaPreview> = {
   // СПАЛЬНИ
   [makeCollectionHref("amber", "bedrooms")]: {
-    title: "Спальня «АМБЕР»",
+    titleKey: "mega.preview.bedrooms.amber",
+    fallback: "Спальня «АМБЕР»",
     main: "/mega/bedrooms/amber/main.jpg",
     a: "/mega/bedrooms/amber/1.jpg",
     b: "/mega/bedrooms/amber/2.jpg",
   },
   [makeCollectionHref("scandi", "bedrooms")]: {
-    title: "Спальня «СКАНДИ»",
+    titleKey: "mega.preview.bedrooms.scandi",
+    fallback: "Спальня «СКАНДИ»",
     main: "/mega/bedrooms/scandi/main.jpg",
     a: "/mega/bedrooms/scandi/1.jpg",
     b: "/mega/bedrooms/scandi/2.jpg",
   },
   [makeCollectionHref("elizabeth", "bedrooms")]: {
-    title: "Спальня «ЭЛИЗАБЕТ»",
+    titleKey: "mega.preview.bedrooms.elizabeth",
+    fallback: "Спальня «ЭЛИЗАБЕТ»",
     main: "/mega/bedrooms/elizabeth/main.jpg",
     a: "/mega/bedrooms/elizabeth/1.jpg",
     b: "/mega/bedrooms/elizabeth/2.jpg",
   },
   [makeCollectionHref("salvador", "bedrooms")]: {
-    title: "Спальня «САЛЬВАДОР»",
+    titleKey: "mega.preview.bedrooms.salvador",
+    fallback: "Спальня «САЛЬВАДОР»",
     main: "/mega/bedrooms/salvador/main.jpg",
     a: "/mega/bedrooms/salvador/1.jpg",
     b: "/mega/bedrooms/salvador/2.jpg",
   },
   [makeCollectionHref("pitti", "bedrooms")]: {
-    title: "Спальня «ПИТТИ»",
+    titleKey: "mega.preview.bedrooms.pitti",
+    fallback: "Спальня «ПИТТИ»",
     main: "/mega/bedrooms/pitti/main.jpg",
     a: "/mega/bedrooms/pitti/1.jpg",
     b: "/mega/bedrooms/pitti/2.jpg",
   },
   [makeCollectionHref("buongiorno", "bedrooms")]: {
-    title: "Спальня «БОНЖОРНО»",
+    titleKey: "mega.preview.bedrooms.buongiorno",
+    fallback: "Спальня «БОНЖОРНО»",
     main: "/mega/bedrooms/buongiorno/main.jpg",
     a: "/mega/bedrooms/buongiorno/1.jpg",
     b: "/mega/bedrooms/buongiorno/2.jpg",
@@ -156,25 +234,29 @@ export const MEGA_PREVIEWS: Record<string, MegaPreview> = {
 
   // ГОСТИНЫЕ
   [makeCollectionHref("scandi", "living")]: {
-    title: "Гостиная «СКАНДИ»",
+    titleKey: "mega.preview.living.scandi",
+    fallback: "Гостиная «СКАНДИ»",
     main: "/mega/living/scandi/main.jpg",
     a: "/mega/living/scandi/1.jpg",
     b: "/mega/living/scandi/2.jpg",
   },
   [makeCollectionHref("pitti", "living")]: {
-    title: "Гостиная «ПАТТИ»",
+    titleKey: "mega.preview.living.pitti",
+    fallback: "Гостиная «ПАТТИ»",
     main: "/mega/living/pitti/main.jpg",
     a: "/mega/living/pitti/1.jpg",
     b: "/mega/living/pitti/2.jpg",
   },
   [makeCollectionHref("salvador", "living")]: {
-    title: "Гостиная «САЛЬВАДОР»",
+    titleKey: "mega.preview.living.salvador",
+    fallback: "Гостиная «САЛЬВАДОР»",
     main: "/mega/living/salvador/main.jpg",
     a: "/mega/living/salvador/1.jpg",
     b: "/mega/living/salvador/2.jpg",
   },
   [makeCollectionHref("buongiorno", "living")]: {
-    title: "Гостиная «BERGEN WHITE»",
+    titleKey: "mega.preview.living.bergenWhite",
+    fallback: "Гостиная «BERGEN WHITE»",
     main: "/mega/living/buongiorno/main.jpg",
     a: "/mega/living/buongiorno/1.jpg",
     b: "/mega/living/buongiorno/2.jpg",
@@ -182,13 +264,15 @@ export const MEGA_PREVIEWS: Record<string, MegaPreview> = {
 
   // МОЛОДЕЖНЫЕ
   [makeCollectionHref("scandi", "youth")]: {
-    title: "Молодежная «СКАНДИ»",
+    titleKey: "mega.preview.youth.scandi",
+    fallback: "Молодежная «СКАНДИ»",
     main: "/mega/youth/scandi/main.jpg",
     a: "/mega/youth/scandi/1.jpg",
     b: "/mega/youth/scandi/2.jpg",
   },
   [makeCollectionHref("elizabeth", "youth")]: {
-    title: "Молодежная «ЭЛИЗАБЕТ»",
+    titleKey: "mega.preview.youth.elizabeth",
+    fallback: "Молодежная «ЭЛИЗАБЕТ»",
     main: "/mega/youth/elizabeth/main.jpg",
     a: "/mega/youth/elizabeth/1.jpg",
     b: "/mega/youth/elizabeth/2.jpg",
@@ -197,8 +281,6 @@ export const MEGA_PREVIEWS: Record<string, MegaPreview> = {
 
 /**
  * ✅ Маппинг: href коллекции -> id "товара-витрины"
- * Это позволит в /catalog/[slug] или в mega-menu сразу знать id товара,
- * чтобы ProductClient работал как обычный товар (корзина/избранное).
  */
 export const COLLECTION_ID_BY_HREF: Record<string, string> = Object.keys(
   MEGA_PREVIEWS,
@@ -210,7 +292,7 @@ export const COLLECTION_ID_BY_HREF: Record<string, string> = Object.keys(
 }, {} as Record<string, string>);
 
 /**
- * ✅ Если вдруг нужно: href -> {brand, category}
+ * ✅ href -> {brand, category}
  */
 export const COLLECTION_META_BY_HREF: Record<
   string,
@@ -224,13 +306,15 @@ export const COLLECTION_META_BY_HREF: Record<
 
 export const REGION_DATA = {
   uz: {
-    label: "Узбекистан",
+    labelKey: "region.uz",
+    fallback: "Узбекистан",
     phone: "+998 90 000-00-00",
     addresses: ["Rich House Мирзо-Улугбека, 18"],
     phonePrefix: "+998",
   },
   ru: {
-    label: "Россия",
+    labelKey: "region.ru",
+    fallback: "Россия",
     phone: "+7 495 077-85-59",
     addresses: [
       "Москва, ул. Тверская, 12",

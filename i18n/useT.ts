@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRegionLang } from "/context/region-lang";
+import { useRegionLang } from "../app/context/region-lang";
 import { getDict, t } from "./index";
 
 export function useT() {
