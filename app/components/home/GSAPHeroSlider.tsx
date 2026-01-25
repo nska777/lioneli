@@ -1,10 +1,10 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import gsap from "gsap";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 type Slide = {
   id: string;
@@ -46,26 +46,48 @@ export default function GSAPHeroSlider({
   slides?: Slide[];
   autoMs?: number;
 }) {
+  const router = useRouter();
+
   const rootRef = useRef<HTMLDivElement | null>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
   const autoRef = useRef<number | null>(null);
   const busyRef = useRef(false);
 
   const [active, setActive] = useState(0);
+  const activeRef = useRef(0);
+
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
 
   const reducedMotion = useMemo(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   }, []);
 
+  const stopAuto = () => {
+    if (autoRef.current) window.clearInterval(autoRef.current);
+    autoRef.current = null;
+  };
+
+  const startAuto = () => {
+    stopAuto();
+    if (reducedMotion) return;
+    autoRef.current = window.setInterval(() => {
+      if (!busyRef.current) go(activeRef.current + 1);
+    }, autoMs);
+  };
+
   const go = (nextIdx: number) => {
     if (!rootRef.current) return;
     if (busyRef.current) return;
-    busyRef.current = true;
 
     const root = rootRef.current;
-    const prevIdx = active;
+    const prevIdx = activeRef.current;
     const clamped = (nextIdx + slides.length) % slides.length;
+    if (clamped === prevIdx) return;
+
+    busyRef.current = true;
 
     const prev = root.querySelector(
       `[data-slide="${prevIdx}"]`,
@@ -80,7 +102,6 @@ export default function GSAPHeroSlider({
       return;
     }
 
-    // элементы внутри
     const prevImg = prev.querySelector("[data-img]") as HTMLElement | null;
     const nextImg = next.querySelector("[data-img]") as HTMLElement | null;
     const prevOverlay = prev.querySelector(
@@ -96,29 +117,27 @@ export default function GSAPHeroSlider({
     gsap.set(next, { zIndex: 2, opacity: 1, pointerEvents: "auto" });
     gsap.set(prev, { zIndex: 1, pointerEvents: "none" });
 
+    // начальные состояния next
+    gsap.set(nextImg, { scale: 1.06, filter: "blur(8px)" });
+    gsap.set(nextOverlay, { opacity: 0.25 });
+    gsap.set([nextTitle, nextBtn], { y: 18, opacity: 0 });
+
     const tl = gsap.timeline({
       defaults: { ease: "power3.out" },
       onComplete: () => {
-        // фиксируем состояния
-        gsap.set(prev, { opacity: 0 });
+        gsap.set(prev, { opacity: 0, pointerEvents: "none" });
         setActive(clamped);
         busyRef.current = false;
       },
     });
 
-    // Начальные состояния next
-    gsap.set(nextImg, { scale: 1.06, filter: "blur(6px)" });
-    gsap.set(nextOverlay, { opacity: 0.35 });
-    gsap.set([nextTitle, nextBtn], { y: 18, opacity: 0 });
-
-    // Премиальный переход (без резких рамок)
     tl.to(prevImg, { scale: 1.02, duration: 0.45 }, 0)
-      .to(prevOverlay, { opacity: 0.55, duration: 0.45 }, 0)
+      .to(prevOverlay, { opacity: 0.62, duration: 0.45 }, 0)
       .to(prev, { opacity: 0, duration: 0.55 }, 0.1)
 
       .to(
         nextImg,
-        { scale: 1, filter: "blur(0px)", duration: 0.85, ease: "expo.out" },
+        { scale: 1, filter: "blur(0px)", duration: 0.9, ease: "expo.out" },
         0.05,
       )
       .to(nextOverlay, { opacity: 0.55, duration: 0.7 }, 0.1)
@@ -129,37 +148,27 @@ export default function GSAPHeroSlider({
     tlRef.current = tl;
   };
 
-  const next = () => go(active + 1);
-  const prev = () => go(active - 1);
-
-  const stopAuto = () => {
-    if (autoRef.current) window.clearInterval(autoRef.current);
-    autoRef.current = null;
-  };
-
-  const startAuto = () => {
-    stopAuto();
-    if (reducedMotion) return;
-    autoRef.current = window.setInterval(() => {
-      // не дергаем, если уже идет анимация
-      if (!busyRef.current) next();
-    }, autoMs);
-  };
+  const next = () => go(activeRef.current + 1);
+  const prev = () => go(activeRef.current - 1);
 
   useLayoutEffect(() => {
     if (!rootRef.current) return;
 
-    // initial show
     const root = rootRef.current;
+
+    // initial state
     slides.forEach((_, i) => {
       const el = root.querySelector(
         `[data-slide="${i}"]`,
       ) as HTMLElement | null;
       if (!el) return;
-      gsap.set(el, { opacity: i === 0 ? 1 : 0, zIndex: i === 0 ? 2 : 1 });
+      gsap.set(el, {
+        opacity: i === 0 ? 1 : 0,
+        zIndex: i === 0 ? 2 : 1,
+        pointerEvents: i === 0 ? "auto" : "none",
+      });
     });
 
-    // микро-въезд контента на первом
     if (!reducedMotion) {
       const first = root.querySelector(
         `[data-slide="0"]`,
@@ -171,15 +180,15 @@ export default function GSAPHeroSlider({
       const title = first?.querySelector("[data-title]") as HTMLElement | null;
       const btn = first?.querySelector("[data-btn]") as HTMLElement | null;
 
-      gsap.set(img, { scale: 1.06, filter: "blur(6px)" });
-      gsap.set(overlay, { opacity: 0.35 });
+      gsap.set(img, { scale: 1.06, filter: "blur(8px)" });
+      gsap.set(overlay, { opacity: 0.25 });
       gsap.set([title, btn], { y: 18, opacity: 0 });
 
       gsap
         .timeline({ defaults: { ease: "power3.out" } })
         .to(
           img,
-          { scale: 1, filter: "blur(0px)", duration: 1.0, ease: "expo.out" },
+          { scale: 1, filter: "blur(0px)", duration: 1.05, ease: "expo.out" },
           0,
         )
         .to(overlay, { opacity: 0.55, duration: 0.7 }, 0.1)
@@ -193,25 +202,31 @@ export default function GSAPHeroSlider({
       tlRef.current?.kill();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reducedMotion]);
+  }, [reducedMotion, slides.length, autoMs]);
 
   return (
     <section className="w-full">
       <div className="mx-auto w-full max-w-[1200px] px-4">
-        {/* сам слайдер — широкий, под меню */}
         <div
           ref={rootRef}
           onMouseEnter={stopAuto}
           onMouseLeave={startAuto}
+          onClick={() =>
+            router.push(slides[activeRef.current]?.href ?? "/catalog")
+          }
           className={cn(
             "relative overflow-hidden rounded-[22px]",
-            "border border-black/10 bg-white",
-            "shadow-[0_20px_60px_rgba(0,0,0,0.12)]",
+            "bg-white",
+            // вместо грубой рамки — тонкий highlight
+            "ring-1 ring-black/10",
+            "shadow-[0_22px_70px_rgba(0,0,0,0.14)]",
             "h-[420px] md:h-[520px]",
             "cursor-pointer select-none",
           )}
         >
-          {/* slides stack */}
+          {/* мягкий внутренний highlight (Apple-style) */}
+          <div className="pointer-events-none absolute inset-0 z-[5] rounded-[22px] ring-1 ring-white/25" />
+
           {slides.map((s, i) => (
             <div
               key={s.id}
@@ -219,35 +234,25 @@ export default function GSAPHeroSlider({
               className="absolute inset-0 opacity-0"
               aria-hidden={i !== active}
             >
-              {/* image */}
-              <div className="absolute inset-0">
-                <Image
-                  src={s.image}
-                  alt={s.title}
-                  fill
-                  priority={i === 0}
-                  className="object-cover"
-                />
-                <div
-                  data-img
-                  className="absolute inset-0"
-                  // этот слой нужен чтобы анимировать scale/blur без дерганий Image
-                  style={{
-                    backgroundImage: `url(${s.image})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                    transform: "translateZ(0)",
-                  }}
-                />
-              </div>
+              {/* один (!) слой для изображения (анимируем scale/blur без дерганий) */}
+              <div
+                data-img
+                className="absolute inset-0 will-change-transform"
+                style={{
+                  backgroundImage: `url(${s.image})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  transform: "translateZ(0)",
+                }}
+              />
 
-              {/* overlay (премиальный) */}
+              {/* overlay: читаемость + виньетка (премиум) */}
               <div
                 data-overlay
                 className="absolute inset-0"
                 style={{
                   background:
-                    "linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.28) 38%, rgba(0,0,0,0.18) 60%, rgba(0,0,0,0.20) 100%)",
+                    "radial-gradient(80% 65% at 50% 45%, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.38) 70%, rgba(0,0,0,0.55) 100%), linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.24) 40%, rgba(0,0,0,0.18) 62%, rgba(0,0,0,0.28) 100%)",
                 }}
               />
 
@@ -257,10 +262,10 @@ export default function GSAPHeroSlider({
                   <h2
                     data-title
                     className={cn(
-                      "text-white font-semibold",
-                      "tracking-[0.06em] uppercase",
+                      "text-white font-semibold uppercase",
+                      "tracking-[0.08em]",
                       "text-[28px] md:text-[44px] leading-[1.05]",
-                      "drop-shadow-[0_10px_30px_rgba(0,0,0,0.35)]",
+                      "drop-shadow-[0_14px_35px_rgba(0,0,0,0.40)]",
                     )}
                   >
                     {s.title}
@@ -270,15 +275,18 @@ export default function GSAPHeroSlider({
                     <Link
                       data-btn
                       href={s.href}
+                      onClick={(e) => e.stopPropagation()}
                       className={cn(
                         "inline-flex items-center justify-center",
                         "rounded-2xl px-6 py-3",
-                        "bg-white/85 backdrop-blur-xl",
-                        "border border-white/30",
-                        "shadow-[0_16px_45px_rgba(0,0,0,0.25)]",
+                        "bg-white/90 backdrop-blur-xl",
+                        "ring-1 ring-white/25",
+                        "shadow-[0_18px_55px_rgba(0,0,0,0.22)]",
                         "text-black",
                         "text-[12px] md:text-[13px] tracking-[0.18em] uppercase",
                         "transition",
+                        "hover:-translate-y-[1px] hover:shadow-[0_22px_70px_rgba(0,0,0,0.25)]",
+                        "active:translate-y-0",
                         "cursor-pointer",
                       )}
                     >
@@ -300,8 +308,8 @@ export default function GSAPHeroSlider({
             className={cn(
               "absolute left-4 top-1/2 -translate-y-1/2 z-20",
               "h-11 w-11 rounded-full",
-              "bg-white/75 backdrop-blur-xl",
-              "border border-white/30",
+              "bg-white/70 backdrop-blur-xl",
+              "ring-1 ring-black/10",
               "shadow-[0_16px_45px_rgba(0,0,0,0.22)]",
               "grid place-items-center",
               "hover:bg-white/85 transition",
@@ -321,8 +329,8 @@ export default function GSAPHeroSlider({
             className={cn(
               "absolute right-4 top-1/2 -translate-y-1/2 z-20",
               "h-11 w-11 rounded-full",
-              "bg-white/75 backdrop-blur-xl",
-              "border border-white/30",
+              "bg-white/70 backdrop-blur-xl",
+              "ring-1 ring-black/10",
               "shadow-[0_16px_45px_rgba(0,0,0,0.22)]",
               "grid place-items-center",
               "hover:bg-white/85 transition",
@@ -333,26 +341,34 @@ export default function GSAPHeroSlider({
             <ChevronRight className="h-5 w-5 text-black/80" />
           </button>
 
+          {/* dots: пилюли */}
           {/* dots */}
-          <div className="absolute bottom-4 left-0 right-0 z-20 flex justify-center gap-2">
-            {slides.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  go(i);
-                }}
-                className={cn(
-                  "h-2.5 w-2.5 rounded-full transition",
-                  i === active
-                    ? "bg-white shadow-[0_0_0_4px_rgba(255,255,255,0.25)]"
-                    : "bg-white/45 hover:bg-white/70",
-                  "cursor-pointer",
-                )}
-                aria-label={`Слайд ${i + 1}`}
-              />
-            ))}
+          <div className="absolute bottom-4 left-0 right-0 z-[999] flex justify-center pointer-events-auto">
+            {/* лёгкая подложка, чтобы точки всегда читались */}
+            <div className="rounded-full bg-black/18 px-3 py-2 backdrop-blur-[6px] ring-1 ring-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
+              <div className="flex items-center gap-2">
+                {Array.from({ length: slides.length }).map((_, idx) => {
+                  const isActive = idx === active;
+                  return (
+                    <button
+                      key={`dot-${idx}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        go(idx);
+                      }}
+                      className={cn(
+                        "h-2.5 flex-none rounded-full transition cursor-pointer",
+                        isActive
+                          ? "w-8 bg-white shadow-[0_0_0_4px_rgba(255,255,255,0.16)]"
+                          : "w-2.5 bg-white/70 hover:bg-white",
+                      )}
+                      aria-label={`Слайд ${idx + 1}`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       </div>
