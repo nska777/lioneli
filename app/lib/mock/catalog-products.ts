@@ -16,7 +16,34 @@ export type CatalogProduct = {
   menu: string;
   collection: string;
   type: string;
+
+  // ✅ опционально (чтобы не ломать текущие моки)
+  isCollection?: false;
 };
+
+export type CollectionShowcaseProduct = {
+  id: string; // col-amber-bedrooms
+  title: string;
+
+  price_rub: number;
+  price_uzs: number;
+
+  badge?: string;
+  image: string;
+
+  isCollection: true;
+
+  brand: string;
+  category: string;
+
+  // ✅ чтобы CartClient не ломался, если где-то ожидают эти поля
+  // (мы не обязаны, но это "страховка")
+  menu?: string;
+  collection?: string;
+  type?: string;
+};
+
+export type AnyProduct = CatalogProduct | CollectionShowcaseProduct;
 
 // Верхний фильтр (бренды/категории бренда)
 export const BRANDS = [
@@ -25,7 +52,8 @@ export const BRANDS = [
   { title: "ЭЛИЗАБЕТ", slug: "elizabeth" },
   { title: "САЛЬВАДОР", slug: "salvador" },
   { title: "ПИТТИ", slug: "pitti" },
-  { title: "БОНЖОРНО", slug: "bonjorno" },
+  // ✅ привели к одному slug (важно для фильтрации коллекций)
+  { title: "БОНЖОРНО", slug: "buongiorno" },
 ] as const;
 
 export const CATS = [
@@ -124,8 +152,160 @@ export const CATALOG_MOCK: CatalogProduct[] = Array.from({ length: 24 }).map(
       menu,
       collection,
       type,
+
+      isCollection: false,
     };
   },
 );
 
-export const CATALOG_BY_ID = new Map(CATALOG_MOCK.map((p) => [p.id, p]));
+// =====================================================
+// ✅ ВИТРИНЫ-КОЛЛЕКЦИИ (покупаются как 1 товар)
+// =====================================================
+
+export const COLLECTION_PRODUCTS: CollectionShowcaseProduct[] = [
+  // bedrooms
+  {
+    id: "col-amber-bedrooms",
+    title: "Спальня «АМБЕР»",
+    price_rub: 48900,
+    price_uzs: 6852000,
+    badge: "Коллекция",
+    image: "/mega/bedrooms/amber/main.jpg",
+    isCollection: true,
+    brand: "amber",
+    category: "bedrooms",
+  },
+  {
+    id: "col-scandi-bedrooms",
+    title: "Спальня «СКАНДИ»",
+    price_rub: 47900,
+    price_uzs: 6710000,
+    badge: "Коллекция",
+    image: "/mega/bedrooms/scandi/main.jpg",
+    isCollection: true,
+    brand: "scandi",
+    category: "bedrooms",
+  },
+  {
+    id: "col-elizabeth-bedrooms",
+    title: "Спальня «ЭЛИЗАБЕТ»",
+    price_rub: 51200,
+    price_uzs: 7168000,
+    badge: "Коллекция",
+    image: "/mega/bedrooms/elizabeth/main.jpg",
+    isCollection: true,
+    brand: "elizabeth",
+    category: "bedrooms",
+  },
+  {
+    id: "col-salvador-bedrooms",
+    title: "Спальня «САЛЬВАДОР»",
+    price_rub: 53500,
+    price_uzs: 7490000,
+    badge: "Коллекция",
+    image: "/mega/bedrooms/salvador/main.jpg",
+    isCollection: true,
+    brand: "salvador",
+    category: "bedrooms",
+  },
+  {
+    id: "col-pitti-bedrooms",
+    title: "Спальня «ПИТТИ»",
+    price_rub: 50500,
+    price_uzs: 7070000,
+    badge: "Коллекция",
+    image: "/mega/bedrooms/pitti/main.jpg",
+    isCollection: true,
+    brand: "pitti",
+    category: "bedrooms",
+  },
+  {
+    id: "col-buongiorno-bedrooms",
+    title: "Спальня «БОНЖОРНО»",
+    price_rub: 49800,
+    price_uzs: 6972000,
+    badge: "Коллекция",
+    image: "/mega/bedrooms/buongiorno/main.jpg",
+    isCollection: true,
+    brand: "buongiorno",
+    category: "bedrooms",
+  },
+
+  // living
+  {
+    id: "col-scandi-living",
+    title: "Гостиная «СКАНДИ»",
+    price_rub: 45900,
+    price_uzs: 6426000,
+    badge: "Коллекция",
+    image: "/mega/living/scandi/main.jpg",
+    isCollection: true,
+    brand: "scandi",
+    category: "living",
+  },
+  {
+    id: "col-pitti-living",
+    title: "Гостиная «ПАТТИ»",
+    price_rub: 47200,
+    price_uzs: 6608000,
+    badge: "Коллекция",
+    image: "/mega/living/pitti/main.jpg",
+    isCollection: true,
+    brand: "pitti",
+    category: "living",
+  },
+  {
+    id: "col-salvador-living",
+    title: "Гостиная «САЛЬВАДОР»",
+    price_rub: 52500,
+    price_uzs: 7350000,
+    badge: "Коллекция",
+    image: "/mega/living/salvador/main.jpg",
+    isCollection: true,
+    brand: "salvador",
+    category: "living",
+  },
+  {
+    id: "col-buongiorno-living",
+    title: "Гостиная «BERGEN WHITE»",
+    price_rub: 49900,
+    price_uzs: 6986000,
+    badge: "Коллекция",
+    image: "/mega/living/buongiorno/main.jpg",
+    isCollection: true,
+    brand: "buongiorno",
+    category: "living",
+  },
+
+  // youth
+  {
+    id: "col-scandi-youth",
+    title: "Молодежная «СКАНДИ»",
+    price_rub: 44100,
+    price_uzs: 6174000,
+    badge: "Коллекция",
+    image: "/mega/youth/scandi/main.jpg",
+    isCollection: true,
+    brand: "scandi",
+    category: "youth",
+  },
+  {
+    id: "col-elizabeth-youth",
+    title: "Молодежная «ЭЛИЗАБЕТ»",
+    price_rub: 46500,
+    price_uzs: 6510000,
+    badge: "Коллекция",
+    image: "/mega/youth/elizabeth/main.jpg",
+    isCollection: true,
+    brand: "elizabeth",
+    category: "youth",
+  },
+];
+
+// ✅ единая база: и товары, и витрины
+export const CATALOG_ALL: AnyProduct[] = [...CATALOG_MOCK, ...COLLECTION_PRODUCTS];
+
+// ✅ чтобы /cart и любая логика по id работали без правок
+export const CATALOG_BY_ID = new Map<string, AnyProduct>(
+  CATALOG_ALL.map((p) => [p.id, p]),
+);

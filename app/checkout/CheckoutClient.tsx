@@ -7,9 +7,8 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 import { useRegionLang } from "../context/region-lang";
 import { useShopState } from "../context/shop-state";
-import { byId } from "../lib/mock/products";
+import { CATALOG_BY_ID } from "@/app/lib/mock/catalog-products";
 
-// ✅ подтягиваем профиль как в кабинете
 import { supabase } from "@/app/lib/supabase/client";
 
 function formatMoney(n: number, region: "uz" | "ru") {
@@ -58,18 +57,15 @@ export default function CheckoutClient() {
   const { region } = useRegionLang();
   const shop = useShopState() as any;
 
-  // формы
   const [phone, setPhone] = useState(region === "uz" ? "+998 " : "+7 ");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
 
-  // статус
   const [submitting, setSubmitting] = useState(false);
   const [doneOrderId, setDoneOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ 1) подтягиваем customer cache (адрес/коммент/телефон/имя если вводили)
   useEffect(() => {
     const c = safeParse<CustomerCache>(localStorage.getItem(LS_CUSTOMER), {});
     if (c.phone) setPhone(c.phone);
@@ -79,7 +75,6 @@ export default function CheckoutClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ✅ 2) подтягиваем профиль из supabase и ДОЗАПОЛНЯЕМ (как ты и хотел)
   useEffect(() => {
     let alive = true;
 
@@ -114,15 +109,12 @@ export default function CheckoutClient() {
   }, []);
 
   // ===== items source =====
-
-  // cart: Record<string, number>
   const cart = shop?.cart ?? {};
   const cartIds = useMemo(
     () => Object.keys(cart).filter((id) => (cart[id] ?? 0) > 0),
     [cart],
   );
 
-  // oneClick from state OR localStorage
   const oneClick = shop?.oneClick ?? null;
 
   const oneClickFromLS = useMemo(() => {
@@ -152,26 +144,27 @@ export default function CheckoutClient() {
 
     return ids
       .map((id) => {
-        const p = byId.get(id);
+        const key = String(id);
+
+        const p = CATALOG_BY_ID.get(key);
         if (!p) return null;
 
         const qty = useOneClick
           ? (effectiveOneClick?.qty ?? 1)
-          : (cart[id] ?? 1);
+          : (cart[key] ?? 1);
 
         const unit =
-          region === "uz"
-            ? ((p as any).price?.uzs ?? (p as any).price_uzs)
-            : ((p as any).price?.rub ?? (p as any).price_rub);
+          region === "uz" ? (p as any).price_uzs : (p as any).price_rub;
 
         return {
-          id,
-          title: p.title,
+          id: key,
+          title: (p as any).title,
           qty,
           unit,
           sum: unit * qty,
         };
       })
+
       .filter(Boolean) as Array<{
       id: string;
       title: string;
@@ -193,7 +186,6 @@ export default function CheckoutClient() {
     setSubmitting(true);
 
     try {
-      // ✅ сохраняем customer cache (чтобы адрес/коммент подтягивались всегда)
       const cache: CustomerCache = {
         phone: phone.trim(),
         name: name.trim(),
@@ -229,7 +221,6 @@ export default function CheckoutClient() {
 
       setDoneOrderId(orderId);
 
-      // ✅ если это oneclick — чистим oneClick, если обычная корзина — чистим cart
       if (mode === "oneclick" && typeof shop?.clearOneClick === "function") {
         shop.clearOneClick();
       } else if (typeof shop?.clearCart === "function") {
@@ -242,7 +233,6 @@ export default function CheckoutClient() {
     }
   }
 
-  // ✅ Экран успеха
   if (doneOrderId) {
     return (
       <main className="mx-auto w-full max-w-[900px] px-4 py-14">
@@ -285,7 +275,6 @@ export default function CheckoutClient() {
     );
   }
 
-  // ✅ Экран формы
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-10">
       <div>
@@ -301,7 +290,6 @@ export default function CheckoutClient() {
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
-        {/* FORM */}
         <section className="rounded-3xl border border-black/10 bg-white p-5">
           <div className="text-base font-semibold">Данные клиента</div>
 
@@ -356,7 +344,6 @@ export default function CheckoutClient() {
           )}
         </section>
 
-        {/* SUMMARY */}
         <aside className="h-fit rounded-3xl border border-black/10 bg-white p-5">
           <div className="text-base font-semibold">Ваш заказ</div>
 

@@ -1,6 +1,3 @@
-// ProductClient.tsx (обновлённый) — ЛОГИКУ КОРЗИНЫ/1-КЛИК НЕ ТРОГАЮ.
-// Добавил: 1) стрелки на главном фото (prev/next) 2) открытие в полный размер (lightbox) + листание.
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -17,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
+  ArrowUpRight,
 } from "lucide-react";
 
 import { useRegionLang } from "@/app/context/region-lang";
@@ -39,6 +37,13 @@ function formatPrice(value: number, currency: "RUB" | "UZS") {
       : `${Math.round(value).toLocaleString("ru-RU")} сум`;
   }
 }
+
+type MegaPreview = {
+  title: string;
+  main: string;
+  a: string;
+  b: string;
+};
 
 type ProductPageModel = {
   id: string;
@@ -65,6 +70,17 @@ type ProductPageModel = {
     href: string;
     badge?: string;
   }>;
+
+  // UX-связка
+  brand?: string;
+  category?: string;
+  collectionHref?: string;
+  categoryLabel?: string;
+  collectionLabel?: string;
+  collectionPreview?: MegaPreview;
+
+  // ✅ витрина коллекции
+  isCollection?: boolean;
 };
 
 export default function ProductClient({
@@ -76,8 +92,8 @@ export default function ProductClient({
   const { region } = useRegionLang();
   const currency: "RUB" | "UZS" = region === "ru" ? "RUB" : "UZS";
 
-  const { isFav, toggleFav, isInCart, addToCart, removeFromCart, setCartOnly } =
-    useShopState();
+  const shop = useShopState();
+  const { isFav, toggleFav, isInCart, addToCart, removeFromCart } = shop;
 
   const gallery = useMemo(() => {
     const g = Array.isArray(product.gallery)
@@ -130,6 +146,14 @@ export default function ProductClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lightboxOpen, maxLen]);
 
+  const hasCollection =
+    !!product.collectionHref &&
+    !!product.collectionLabel &&
+    !!product.categoryLabel;
+
+  // ✅ для витрины коллекции скрываем правый блок "Коллекция"
+  const showCollectionCard = hasCollection && !product.isCollection;
+
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8">
       {/* breadcrumbs */}
@@ -140,7 +164,26 @@ export default function ProductClient({
         /{" "}
         <Link href="/catalog" className="hover:text-black/70">
           Каталог
-        </Link>{" "}
+        </Link>
+        {hasCollection ? (
+          <>
+            {" "}
+            /{" "}
+            <Link
+              href={`/category/${product.category}`}
+              className="hover:text-black/70"
+            >
+              {product.categoryLabel}
+            </Link>{" "}
+            /{" "}
+            <Link
+              href={product.collectionHref!}
+              className="hover:text-black/70"
+            >
+              {product.collectionLabel}
+            </Link>
+          </>
+        ) : null}{" "}
         / <span className="text-black/60">{product.title}</span>
       </div>
 
@@ -153,6 +196,7 @@ export default function ProductClient({
             "border-black/10 bg-white text-[12px] tracking-[0.16em] uppercase text-black/70",
             "hover:border-black/20 hover:text-black transition",
           )}
+          type="button"
         >
           ← НАЗАД
         </button>
@@ -164,6 +208,7 @@ export default function ProductClient({
               "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2",
               "border-black/10 bg-white text-[13px] text-black/75 hover:border-black/20 hover:text-black transition",
             )}
+            type="button"
           >
             <Heart
               className={cn("h-4 w-4", fav && "fill-current text-rose-600")}
@@ -171,13 +216,13 @@ export default function ProductClient({
             В избранное
           </button>
 
-          {/* верхняя кнопка корзины НЕ меняется на "Добавлено" */}
           <button
             onClick={toggleMainCart}
             className={cn(
               "cursor-pointer inline-flex items-center gap-2 rounded-full px-4 py-2",
               "text-[13px] text-white transition bg-black hover:bg-black/90",
             )}
+            type="button"
           >
             <ShoppingCart className="h-4 w-4" />
             {inCart ? "В корзине" : "В корзину"}
@@ -189,7 +234,6 @@ export default function ProductClient({
         {/* LEFT */}
         <section>
           <div className="relative aspect-square overflow-hidden rounded-3xl bg-black/[0.03]">
-            {/* click = open full */}
             <button
               type="button"
               onClick={() => openLightbox(activeIdx)}
@@ -206,7 +250,6 @@ export default function ProductClient({
               sizes="(max-width: 1024px) 100vw, 520px"
             />
 
-            {/* стрелки на главном фото */}
             {gallery.length > 1 && (
               <>
                 <button
@@ -247,7 +290,6 @@ export default function ProductClient({
               </>
             )}
 
-            {/* иконка "full" */}
             <button
               type="button"
               onClick={(e) => {
@@ -335,7 +377,6 @@ export default function ProductClient({
           </div>
 
           <div className="mt-4 flex items-center gap-4">
-            {/* main cart button (toggle) */}
             <button
               onClick={toggleMainCart}
               className={cn(
@@ -356,11 +397,11 @@ export default function ProductClient({
               {inCart ? "Добавлено" : "В корзину"}
             </button>
 
-            {/* buy 1 click (не трогаю логику) */}
+            {/* ✅ FIX: one-click */}
             <button
               onClick={() => {
-                setCartOnly(product.id, qty);
-                router.push("/checkout");
+                shop.setOneClick(product.id, qty);
+                router.push("/checkout?mode=oneclick");
               }}
               className={cn(
                 "cursor-pointer h-12 flex-1 rounded-none",
@@ -372,6 +413,77 @@ export default function ProductClient({
               Купить в 1 клик
             </button>
           </div>
+
+          {/* ✅ Блок “Коллекция” — СКРЫВАЕМ на витрине */}
+          {showCollectionCard && (
+            <Link
+              href={product.collectionHref!}
+              className={cn(
+                "mt-6 block rounded-3xl border border-black/10 bg-white p-3",
+                "shadow-[0_35px_110px_-85px_rgba(0,0,0,0.35)]",
+                "hover:border-black/20 transition cursor-pointer",
+              )}
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] tracking-[0.18em] uppercase text-black/45">
+                    Коллекция
+                  </div>
+                  <div className="mt-1 text-[14px] font-semibold text-black/85">
+                    {product.categoryLabel} / {product.collectionLabel}
+                  </div>
+                </div>
+                <div className="h-9 w-9 rounded-full border border-black/10 bg-white grid place-items-center">
+                  <ArrowUpRight className="h-4 w-4 text-black/60" />
+                </div>
+              </div>
+
+              <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-black/5">
+                {product.collectionPreview?.main ? (
+                  <Image
+                    src={product.collectionPreview.main}
+                    alt={product.collectionPreview.title}
+                    fill
+                    className="object-cover"
+                    priority
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm text-black/40">
+                    Нет превью
+                  </div>
+                )}
+              </div>
+
+              {!!product.collectionPreview?.title && (
+                <div className="mt-3 text-[12px] font-semibold text-black/80">
+                  {product.collectionPreview.title}
+                </div>
+              )}
+
+              <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-black/5">
+                  {product.collectionPreview?.a ? (
+                    <Image
+                      src={product.collectionPreview.a}
+                      alt=""
+                      fill
+                      className="object-cover"
+                    />
+                  ) : null}
+                </div>
+                <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-black/5">
+                  {product.collectionPreview?.b ? (
+                    <Image
+                      src={product.collectionPreview.b}
+                      alt=""
+                      fill
+                      className="object-cover"
+                    />
+                  ) : null}
+                </div>
+              </div>
+            </Link>
+          )}
         </aside>
       </div>
 
@@ -402,7 +514,9 @@ export default function ProductClient({
 
       <section className="mt-12">
         <h2 className="text-[20px] font-semibold text-black">
-          С этим товаром покупают
+          {product.isCollection
+            ? "Товары коллекции"
+            : "С этим товаром покупают"}
         </h2>
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -442,6 +556,7 @@ export default function ProductClient({
                       ? "bg-emerald-600 text-white hover:bg-emerald-700"
                       : "bg-black text-white hover:bg-black/90",
                   )}
+                  type="button"
                 >
                   {relInCart ? (
                     <span className="inline-flex items-center justify-center gap-2">
@@ -506,7 +621,6 @@ export default function ProductClient({
                     <ChevronRight className="h-6 w-6 text-black/70" />
                   </button>
 
-                  {/* счётчик */}
                   <div className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-[12px] text-black/70">
                     {lightboxIdx + 1} / {maxLen}
                   </div>

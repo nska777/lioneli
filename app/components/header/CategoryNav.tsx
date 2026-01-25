@@ -40,6 +40,9 @@ export default function CategoryNav({
   const menuOuterRef = useRef<HTMLDivElement | null>(null);
   const menuPanelRef = useRef<HTMLDivElement | null>(null);
 
+  // ✅ hover-intent (задержка открытия)
+  const hoverTimer = useRef<number | null>(null);
+
   const activeCat = useMemo(
     () => categories.find((c) => c.key === active) || null,
     [categories, active],
@@ -103,6 +106,20 @@ export default function CategoryNav({
     });
   };
 
+  // ✅ hover-intent helpers
+  const cancelHoverOpen = () => {
+    if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+  };
+
+  const openWithDelay = (key: MegaKey, el: HTMLElement) => {
+    cancelHoverOpen();
+    hoverTimer.current = window.setTimeout(() => {
+      setActive(key);
+      moveIndicatorTo(el, false);
+    }, 240); // увеличивай смело до 350-500, если хочешь
+  };
+
   useLayoutEffect(() => {
     const panel = menuPanelRef.current;
     const outer = menuOuterRef.current;
@@ -138,9 +155,18 @@ export default function CategoryNav({
   }, [open, active]);
 
   const onNavLeave = () => {
+    cancelHoverOpen();
     setActive(null);
     moveIndicatorTo(null);
   };
+
+  // важно: при закрытии — чистим таймер
+  useLayoutEffect(() => {
+    if (!open) cancelHoverOpen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const previewHref = activeItemHref ?? undefined;
 
   return (
     <div className="border-y border-black/10">
@@ -152,20 +178,20 @@ export default function CategoryNav({
               {categories.map((c) => {
                 const isActive = c.key === active;
                 return (
-                  <Link
+                  <button
                     key={c.key}
-                    href={c.href}
-                    onMouseEnter={(e) => {
-                      setActive(c.key);
-                      moveIndicatorTo(e.currentTarget, false);
-                    }}
+                    type="button"
+                    onMouseEnter={(e) => openWithDelay(c.key, e.currentTarget)}
+                    onMouseLeave={cancelHoverOpen}
+                    onFocus={(e) => openWithDelay(c.key, e.currentTarget)}
                     className={cn(
-                      "py-2 transition cursor-pointer",
+                      "py-2 transition cursor-default select-none cursor-pointer",
                       isActive ? "text-black" : "hover:text-black",
                     )}
+                    aria-label={c.label}
                   >
                     {c.label}
-                  </Link>
+                  </button>
                 );
               })}
             </div>
@@ -240,6 +266,7 @@ export default function CategoryNav({
                 "shadow-[0_35px_110px_-65px_rgba(0,0,0,0.55)]",
                 "opacity-0",
               )}
+              onMouseEnter={cancelHoverOpen}
             >
               <div className="px-8 pt-7 pb-8">
                 <div className="grid grid-cols-12 gap-10">
@@ -258,14 +285,14 @@ export default function CategoryNav({
                             const isItemActive = it.href === activeItemHref;
                             const hasPreview = !!MEGA_PREVIEWS[it.href];
 
+                            // ✅ ВАЖНО: теперь это Link, кликабельный
                             return (
-                              <button
+                              <Link
                                 key={it.href}
-                                type="button"
+                                href={it.href}
                                 onMouseEnter={() => setActiveItemHref(it.href)}
                                 onFocus={() => setActiveItemHref(it.href)}
-                                // ❗ссылки пока не активны
-                                onClick={() => {}}
+                                onClick={() => setActive(null)} // закрыть меню после клика
                                 className={cn(
                                   "block w-full text-left cursor-pointer",
                                   "text-[14px] tracking-[0.06em] transition",
@@ -276,7 +303,7 @@ export default function CategoryNav({
                                 )}
                               >
                                 {it.label}
-                              </button>
+                              </Link>
                             );
                           })}
 
@@ -291,40 +318,62 @@ export default function CategoryNav({
                   {/* RIGHT: превью (1 big + 2 small) */}
                   <div className="col-span-5">
                     <div className="min-h-[330px]">
-                      {/* big */}
+                      {/* big (✅ кликабельный) */}
                       <div className="relative overflow-hidden rounded-2xl bg-black/5">
                         <div className="relative aspect-[16/10] w-full">
                           {preview?.main ? (
-                            <Image
-                              key={preview.main}
-                              src={preview.main}
-                              alt={preview.title}
-                              fill
-                              className="object-cover opacity-0 animate-[fade_.22s_ease-out_forwards]"
-                              priority
-                            />
+                            <Link
+                              href={previewHref ?? "#"}
+                              className="group absolute inset-0 block cursor-pointer"
+                              onClick={(e) => {
+                                if (!previewHref) e.preventDefault();
+                                setActive(null);
+                              }}
+                              aria-label={preview.title}
+                            >
+                              <Image
+                                key={preview.main}
+                                src={preview.main}
+                                alt={preview.title}
+                                fill
+                                className="object-cover opacity-0 animate-[fade_.22s_ease-out_forwards] transition duration-700 group-hover:scale-[1.02]"
+                                priority
+                              />
+
+                              {!!preview?.title && (
+                                <div className="absolute inset-x-0 bottom-0 p-4">
+                                  <div className="inline-flex rounded-xl bg-black/55 px-3 py-2 backdrop-blur-md">
+                                    <span className="text-[14px] font-semibold text-white">
+                                      {preview.title}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+
+                              <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-white/85 px-3 py-1 text-[11px] tracking-[0.14em] uppercase text-black/70 opacity-0 group-hover:opacity-100 transition">
+                                Смотреть
+                              </div>
+                            </Link>
                           ) : (
                             <div className="flex h-full w-full items-center justify-center text-sm text-black/40">
                               Наведи на коллекцию
                             </div>
                           )}
-
-                          {!!preview?.title && (
-                            <div className="absolute inset-x-0 bottom-0 p-4">
-                              <div className="inline-flex rounded-xl bg-black/55 px-3 py-2 backdrop-blur-md">
-                                <span className="text-[14px] font-semibold text-white">
-                                  {preview.title}
-                                </span>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
 
-                      {/* 2 small */}
+                      {/* 2 small (✅ кликабельные) */}
                       <div className="mt-4 grid grid-cols-2 gap-4">
-                        <MiniCard src={preview?.a} />
-                        <MiniCard src={preview?.b} />
+                        <MiniCard
+                          src={preview?.a}
+                          href={previewHref}
+                          onGo={() => setActive(null)}
+                        />
+                        <MiniCard
+                          src={preview?.b}
+                          href={previewHref}
+                          onGo={() => setActive(null)}
+                        />
                       </div>
 
                       {/* заглушка под будущие карточки */}
@@ -353,18 +402,36 @@ export default function CategoryNav({
   );
 }
 
-function MiniCard({ src }: { src?: string }) {
+function MiniCard({
+  src,
+  href,
+  onGo,
+}: {
+  src?: string;
+  href?: string;
+  onGo?: () => void;
+}) {
   return (
     <div className="relative overflow-hidden rounded-2xl bg-black/5">
       <div className="relative aspect-[16/10] w-full">
         {src ? (
-          <Image
-            key={src}
-            src={src}
-            alt=""
-            fill
-            className="object-cover opacity-0 animate-[fade_.22s_ease-out_forwards]"
-          />
+          <Link
+            href={href ?? "#"}
+            className="group absolute inset-0 block cursor-pointer"
+            onClick={(e) => {
+              if (!href) e.preventDefault();
+              onGo?.();
+            }}
+            aria-label="Открыть"
+          >
+            <Image
+              key={src}
+              src={src}
+              alt=""
+              fill
+              className="object-cover opacity-0 animate-[fade_.22s_ease-out_forwards] transition duration-700 group-hover:scale-[1.03]"
+            />
+          </Link>
         ) : (
           <div className="flex h-full w-full items-center justify-center text-xs text-black/35">
             —

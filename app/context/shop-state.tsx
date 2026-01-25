@@ -11,6 +11,8 @@ import React, {
 
 type CartMap = Record<string, number>; // id -> qty
 
+type OneClick = { id: string; qty: number } | null;
+
 export type ShopState = {
   favorites: string[];
   isFav: (id: string) => boolean;
@@ -18,28 +20,27 @@ export type ShopState = {
   favCount: number;
 
   cart: CartMap;
-  cartCount: number; // сумма qty
+  cartCount: number;
   isInCart: (id: string) => boolean;
 
-  // базовые методы (на будущее для страницы корзины)
   addToCart: (id: string, qty?: number) => void;
   removeFromCart: (id: string) => void;
-
-  // ✅ toggle как у лайка (добавить/убрать)
   toggleCart: (id: string) => void;
 
-  // ✅ добавили для страницы /cart
   setCartQty: (id: string, qty: number) => void;
   clearCart: () => void;
 
-  // ✅ one-click: оставить в корзине только этот товар
-  setCartOnly: (id: string, qty?: number) => void;
+  // ✅ one-click режим (checkout?mode=oneclick)
+  oneClick: OneClick;
+  setOneClick: (id: string, qty?: number) => void;
+  clearOneClick: () => void;
 };
 
 const Ctx = createContext<ShopState | null>(null);
 
 const LS_FAV = "lioneto:favorites:v1";
 const LS_CART = "lioneto:cart:v1";
+const LS_ONECLICK = "lioneto:oneclick:v1";
 
 function safeParse<T>(raw: string | null, fallback: T): T {
   if (!raw) return fallback;
@@ -53,13 +54,19 @@ function safeParse<T>(raw: string | null, fallback: T): T {
 export function ShopStateProvider({ children }: { children: React.ReactNode }) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [cart, setCart] = useState<CartMap>({});
+  const [oneClick, setOneClickState] = useState<OneClick>(null);
 
   // init from localStorage
   useEffect(() => {
     const fav = safeParse<string[]>(localStorage.getItem(LS_FAV), []);
     const crt = safeParse<CartMap>(localStorage.getItem(LS_CART), {});
+    const oc = safeParse<OneClick>(localStorage.getItem(LS_ONECLICK), null);
+
     setFavorites(Array.isArray(fav) ? fav : []);
     setCart(crt && typeof crt === "object" ? crt : {});
+    setOneClickState(
+      oc?.id ? { id: String(oc.id), qty: Math.max(1, oc.qty || 1) } : null,
+    );
   }, []);
 
   // persist
@@ -70,6 +77,10 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem(LS_CART, JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    localStorage.setItem(LS_ONECLICK, JSON.stringify(oneClick));
+  }, [oneClick]);
 
   const api = useMemo<ShopState>(() => {
     const isFav = (id: string) => favorites.includes(id);
@@ -82,7 +93,6 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
 
     const isInCart = (id: string) => (cart[id] ?? 0) > 0;
 
-    // базовое добавление qty (страница корзины пригодится)
     const addToCart = (id: string, qty = 1) => {
       const q = Math.max(1, Math.floor(qty || 1));
       setCart((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + q }));
@@ -96,7 +106,6 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
-    // ✅ toggle логика: клик = добавить 1, повторный клик = убрать полностью
     const toggleCart = (id: string) => {
       setCart((prev) => {
         const exists = (prev[id] ?? 0) > 0;
@@ -109,7 +118,6 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
-    // ✅ qty setter для /cart
     const setCartQty = (id: string, qty: number) => {
       setCart((prev) => {
         const q = Math.max(0, Math.floor(qty || 0));
@@ -122,14 +130,14 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
-    // ✅ clear для /cart
     const clearCart = () => setCart({});
 
-    // ✅ one-click: оставить только один товар
-    const setCartOnly = (id: string, qty = 1) => {
+    const setOneClick = (id: string, qty = 1) => {
       const q = Math.max(1, Math.floor(qty || 1));
-      setCart({ [id]: q });
+      setOneClickState({ id: String(id), qty: q });
     };
+
+    const clearOneClick = () => setOneClickState(null);
 
     const favCount = favorites.length;
     const cartCount = Object.values(cart).reduce((a, b) => a + (b || 0), 0);
@@ -151,9 +159,11 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
       setCartQty,
       clearCart,
 
-      setCartOnly,
+      oneClick,
+      setOneClick,
+      clearOneClick,
     };
-  }, [favorites, cart]);
+  }, [favorites, cart, oneClick]);
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }
