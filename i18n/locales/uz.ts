@@ -1,21 +1,31 @@
-export default {
+// app/i18n/locales/uz.ts
+
+const uz = {
   common: {
     inDev: "Ishlab chiqilmoqda",
   },
-   header: {
-    pickRegion: "Hududni tanlang",
-    regionUz: "O‘zbekiston",
-    regionRu: "Rossiya",
-    ariaSearch: "Qidiruv",
-    ariaAccount: "Kabinet",
-    ariaFavorites: "Sevimlilar",
-    ariaCart: "Savat",
-  },  
+
   region: {
     uz: "O‘zbekiston",
     ru: "Rossiya",
   },
+
   header: {
+    // системные строки
+    pickRegion: "Hududni tanlang",
+    regionUz: "O‘zbekiston",
+    regionRu: "Rossiya",
+    stores: "Do‘kon manzillari",
+
+    ui: {
+      callMe: "Qo‘ng‘iroq buyurtma qilish",
+    },
+
+    aria: {
+      menu: "Menyu",
+    },
+
+    // верхнее меню
     top: {
       catalog: "Katalog",
       about: "Kompaniya haqida",
@@ -24,6 +34,8 @@ export default {
       cooperation: "Hamkorlik",
       sale: "Aksiyalar",
     },
+
+    // мега-меню
     mega: {
       bedrooms: "YOTOQ XONALAR",
       living: "MEHMONXONALAR",
@@ -31,9 +43,8 @@ export default {
       hallway: "KIRISH YO‘LAKLARI",
       tables: "STOL VA STULLAR",
     },
-    
   },
-  
+
   brand: {
     amber: "AMBER",
     scandi: "SCANDI",
@@ -44,6 +55,7 @@ export default {
     buongiorno: "BUONGIORNO",
     bergen_white: "BERGEN WHITE",
   },
+
   mega: {
     preview: {
       bedrooms: {
@@ -67,3 +79,5 @@ export default {
     },
   },
 };
+
+export default uz;

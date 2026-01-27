@@ -91,7 +91,6 @@ export default function FiltersSidebar({
   const [minLocal, setMinLocal] = useState(value.priceMin);
   const [maxLocal, setMaxLocal] = useState(value.priceMax);
 
-  // ✅ sync local inputs when value changes from URL
   useEffect(() => {
     setMinLocal(value.priceMin);
     setMaxLocal(value.priceMax);
@@ -126,8 +125,8 @@ export default function FiltersSidebar({
         </button>
       </div>
 
-      {/* Меню */}
-      <Section title="Меню" defaultOpen>
+      {/* Разделы */}
+      <Section title="Разделы" defaultOpen>
         {meta.menuItems.map((it) => (
           <CheckRow
             key={it.value}
@@ -170,7 +169,6 @@ export default function FiltersSidebar({
           </div>
         </div>
 
-        {/* двойной range */}
         <div className="mt-3">
           <div className="relative h-10">
             <input
@@ -197,17 +195,17 @@ export default function FiltersSidebar({
 
           <div className="mt-1 flex items-center justify-between text-[12px] text-black/55">
             <span>
-              {value.priceMin.toLocaleString("ru-RU")} {currencyLabel}
+              {value.priceMin.toLocaleString("en-US")} {currencyLabel}
             </span>
             <span>
-              {value.priceMax.toLocaleString("ru-RU")} {currencyLabel}
+              {value.priceMax.toLocaleString("en-US")} {currencyLabel}
             </span>
           </div>
         </div>
       </Section>
 
-      {/* Коллекция */}
-      <Section title="Коллекция" defaultOpen>
+      {/* Коллекции */}
+      <Section title="Коллекции" defaultOpen>
         {meta.collectionItems.map((it) => (
           <CheckRow
             key={it.value}
@@ -223,8 +221,8 @@ export default function FiltersSidebar({
         ))}
       </Section>
 
-      {/* Категории товаров */}
-      <Section title="Категории товаров" defaultOpen>
+      {/* Модули */}
+      <Section title="Модули" defaultOpen>
         {meta.typeItems.map((it) => (
           <CheckRow
             key={it.value}

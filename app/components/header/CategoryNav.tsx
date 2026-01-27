@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
 import { X } from "lucide-react";
+
+import { tF } from "@/i18n";
 import {
   MegaCategory,
   MegaKey,
@@ -25,8 +27,10 @@ function chunkColumns(items: MegaItem[], cols: number) {
 
 export default function CategoryNav({
   categories,
+  dict,
 }: {
   categories: MegaCategory[];
+  dict: any; // словарь i18n (ru/uz)
 }) {
   const [active, setActive] = useState<MegaKey | null>(null);
   const open = active !== null;
@@ -117,7 +121,7 @@ export default function CategoryNav({
     hoverTimer.current = window.setTimeout(() => {
       setActive(key);
       moveIndicatorTo(el, false);
-    }, 240); // увеличивай смело до 350-500, если хочешь
+    }, 240);
   };
 
   useLayoutEffect(() => {
@@ -160,13 +164,24 @@ export default function CategoryNav({
     moveIndicatorTo(null);
   };
 
-  // важно: при закрытии — чистим таймер
   useLayoutEffect(() => {
     if (!open) cancelHoverOpen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // ===== helpers to render i18n text =====
+  const catLabel = (c: MegaCategory) =>
+    tF(dict, String(c.labelKey ?? ""), String(c.fallback ?? ""));
+
+  const itemLabel = (it: MegaItem) =>
+    tF(dict, String(it.labelKey ?? ""), String(it.fallback ?? ""));
+
+  const previewTitle = preview
+    ? tF(dict, String(preview.titleKey ?? ""), String(preview.fallback ?? ""))
+    : "";
+
   const previewHref = activeItemHref ?? undefined;
+  const activeCatTitle = activeCat ? catLabel(activeCat) : "";
 
   return (
     <div className="border-y border-black/10">
@@ -177,6 +192,8 @@ export default function CategoryNav({
             <div className="flex h-16 items-center justify-between text-[15px] tracking-[0.12em] text-black/70">
               {categories.map((c) => {
                 const isActive = c.key === active;
+                const label = catLabel(c);
+
                 return (
                   <button
                     key={c.key}
@@ -188,9 +205,9 @@ export default function CategoryNav({
                       "py-2 transition cursor-default select-none cursor-pointer",
                       isActive ? "text-black" : "hover:text-black",
                     )}
-                    aria-label={c.label}
+                    aria-label={label}
                   >
-                    {c.label}
+                    {label}
                   </button>
                 );
               })}
@@ -205,20 +222,23 @@ export default function CategoryNav({
           {/* MOBILE CATEGORIES */}
           <div className="md:hidden">
             <div className="flex h-14 items-center gap-6 overflow-x-auto whitespace-nowrap text-[13px] tracking-[0.16em] text-black/70">
-              {categories.map((c) => (
-                <button
-                  key={c.key}
-                  onClick={() =>
-                    setActive((prev) => (prev === c.key ? null : c.key))
-                  }
-                  className={cn(
-                    "cursor-pointer py-2 transition",
-                    active === c.key ? "text-black" : "hover:text-black",
-                  )}
-                >
-                  {c.label}
-                </button>
-              ))}
+              {categories.map((c) => {
+                const label = catLabel(c);
+                return (
+                  <button
+                    key={c.key}
+                    onClick={() =>
+                      setActive((prev) => (prev === c.key ? null : c.key))
+                    }
+                    className={cn(
+                      "cursor-pointer py-2 transition",
+                      active === c.key ? "text-black" : "hover:text-black",
+                    )}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
 
             {open && activeCat && (
@@ -226,7 +246,7 @@ export default function CategoryNav({
                 <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-[0_20px_60px_-45px_rgba(0,0,0,0.45)]">
                   <div className="mb-3 flex items-center justify-between">
                     <div className="text-[12px] tracking-[0.18em] text-black/50">
-                      {activeCat.label}
+                      {activeCatTitle}
                     </div>
                     <button
                       className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full hover:bg-black/5 transition"
@@ -245,7 +265,7 @@ export default function CategoryNav({
                         onClick={() => setActive(null)}
                         className="cursor-pointer rounded-xl px-3 py-2 text-[13px] text-black/75 hover:bg-black/5 transition"
                       >
-                        {it.label}
+                        {itemLabel(it)}
                       </Link>
                     ))}
                   </div>
@@ -284,15 +304,15 @@ export default function CategoryNav({
                           {col.map((it) => {
                             const isItemActive = it.href === activeItemHref;
                             const hasPreview = !!MEGA_PREVIEWS[it.href];
+                            const label = itemLabel(it);
 
-                            // ✅ ВАЖНО: теперь это Link, кликабельный
                             return (
                               <Link
                                 key={it.href}
                                 href={it.href}
                                 onMouseEnter={() => setActiveItemHref(it.href)}
                                 onFocus={() => setActiveItemHref(it.href)}
-                                onClick={() => setActive(null)} // закрыть меню после клика
+                                onClick={() => setActive(null)}
                                 className={cn(
                                   "block w-full text-left cursor-pointer",
                                   "text-[14px] tracking-[0.06em] transition",
@@ -302,23 +322,18 @@ export default function CategoryNav({
                                   !hasPreview && "opacity-60",
                                 )}
                               >
-                                {it.label}
+                                {label}
                               </Link>
                             );
                           })}
-
-                          {!activeCat && (
-                            <div className="text-black/50 text-sm">—</div>
-                          )}
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* RIGHT: превью (1 big + 2 small) */}
+                  {/* RIGHT: превью */}
                   <div className="col-span-5">
                     <div className="min-h-[330px]">
-                      {/* big (✅ кликабельный) */}
                       <div className="relative overflow-hidden rounded-2xl bg-black/5">
                         <div className="relative aspect-[16/10] w-full">
                           {preview?.main ? (
@@ -329,22 +344,22 @@ export default function CategoryNav({
                                 if (!previewHref) e.preventDefault();
                                 setActive(null);
                               }}
-                              aria-label={preview.title}
+                              aria-label={previewTitle}
                             >
                               <Image
                                 key={preview.main}
                                 src={preview.main}
-                                alt={preview.title}
+                                alt={previewTitle}
                                 fill
                                 className="object-cover opacity-0 animate-[fade_.22s_ease-out_forwards] transition duration-700 group-hover:scale-[1.02]"
                                 priority
                               />
 
-                              {!!preview?.title && (
+                              {!!previewTitle && (
                                 <div className="absolute inset-x-0 bottom-0 p-4">
                                   <div className="inline-flex rounded-xl bg-black/55 px-3 py-2 backdrop-blur-md">
                                     <span className="text-[14px] font-semibold text-white">
-                                      {preview.title}
+                                      {previewTitle}
                                     </span>
                                   </div>
                                 </div>
@@ -362,7 +377,6 @@ export default function CategoryNav({
                         </div>
                       </div>
 
-                      {/* 2 small (✅ кликабельные) */}
                       <div className="mt-4 grid grid-cols-2 gap-4">
                         <MiniCard
                           src={preview?.a}
@@ -376,7 +390,6 @@ export default function CategoryNav({
                         />
                       </div>
 
-                      {/* заглушка под будущие карточки */}
                       <div className="mt-5 rounded-xl border border-black/10 bg-white px-4 py-3 text-[12px] tracking-[0.14em] uppercase text-black/55">
                         Скоро здесь будут карточки / листание / “заказать”
                       </div>
@@ -385,7 +398,6 @@ export default function CategoryNav({
                 </div>
               </div>
 
-              {/* fade keyframes */}
               <style jsx global>{`
                 @keyframes fade {
                   to {

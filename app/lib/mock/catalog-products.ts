@@ -1,311 +1,363 @@
-// lib/mock/catalog-products.ts
+// app/lib/mock/catalog-products.ts
+// ✅ Единый источник правды для каталога (моки)
+// ✅ Совместимость со старым UI: CATALOG_BY_ID.get + price_rub/price_uzs
+
+export type BrandItem = { title: string; slug: string };
+export type CatItem = { title: string; slug: string };
 
 export type CatalogProduct = {
   id: string;
   title: string;
 
-  price_rub: number;
-  price_uzs: number;
+  // фильтры
+  brand: string; // slug из BRANDS
+  cat: string; // slug из CATS
 
+  // UI
   badge?: string;
-  image: string;
+  sku?: string;
+  href?: string;
 
-  brand: string;
-  category: string;
+  // картинки
+  image: string; // основная
+  gallery?: string[]; // слайдер
 
-  menu: string;
-  collection: string;
-  type: string;
-
-  // ✅ опционально (чтобы не ломать текущие моки)
-  isCollection?: false;
+  // цены (под RU/UZ)
+  priceRUB: number;
+  priceUZS: number;
 };
 
-export type CollectionShowcaseProduct = {
-  id: string; // col-amber-bedrooms
-  title: string;
-
+// ✅ Backward-compat type: старые компоненты читают price_rub/price_uzs
+export type CatalogProductCompat = CatalogProduct & {
   price_rub: number;
   price_uzs: number;
-
-  badge?: string;
-  image: string;
-
-  isCollection: true;
-
-  brand: string;
-  category: string;
-
-  // ✅ чтобы CartClient не ломался, если где-то ожидают эти поля
-  // (мы не обязаны, но это "страховка")
-  menu?: string;
-  collection?: string;
-  type?: string;
 };
 
-export type AnyProduct = CatalogProduct | CollectionShowcaseProduct;
+const pad2 = (n: number) => String(n).padStart(2, "0");
 
-// Верхний фильтр (бренды/категории бренда)
-export const BRANDS = [
-  { title: "АМБЕР", slug: "amber" },
-  { title: "СКАНДИ", slug: "scandi" },
-  { title: "ЭЛИЗАБЕТ", slug: "elizabeth" },
-  { title: "САЛЬВАДОР", slug: "salvador" },
-  { title: "ПИТТИ", slug: "pitti" },
-  // ✅ привели к одному slug (важно для фильтрации коллекций)
-  { title: "БОНЖОРНО", slug: "buongiorno" },
-] as const;
+function makeGallery(basePath: string, count: number) {
+  return Array.from({ length: count }, (_, i) => `${basePath}/${pad2(i + 1)}.jpg`);
+}
 
-export const CATS = [
-  { title: "Спальни", slug: "bedrooms" },
-  { title: "Гостиные", slug: "living" },
-  { title: "Молодежные", slug: "youth" },
-  { title: "Прихожие", slug: "hallway" },
-  { title: "Столы и стулья", slug: "tables" },
-] as const;
+function makeProduct(
+  p: Omit<CatalogProduct, "image"> & { basePath: string; coverIndex?: number },
+) {
+  const cover = pad2(p.coverIndex ?? 1);
+  return {
+    id: p.id,
+    title: p.title,
+    brand: p.brand,
+    cat: p.cat,
+    badge: p.badge ?? "",
+    sku: p.sku ?? "",
+    href: p.href ?? `/product/${p.id}`,
+    image: `${p.basePath}/${cover}.jpg`,
+    gallery: p.gallery ?? [],
+    priceRUB: p.priceRUB,
+    priceUZS: p.priceUZS,
+  } satisfies CatalogProduct;
+}
 
-// Левый сайдбар
-export const MENU_ITEMS = [
-  { label: "Столы и стулья", value: "menu_tables" },
-  { label: "Шкафы купе", value: "menu_wardrobe" },
-  { label: "Кабинеты", value: "menu_office" },
-  { label: "Прихожие", value: "menu_hallway" },
-  { label: "Гостиные", value: "menu_living" },
-  { label: "Спальни", value: "menu_bedrooms" },
+// ✅ коллекции (бренды/серии)
+export const BRANDS: BrandItem[] = [
+  { title: "AMBER", slug: "amber" },
+  { title: "BUONGIORNO", slug: "buongiorno" },
+  { title: "ELIZABETH", slug: "elizabeth" },
+  { title: "PITTI", slug: "pitti" },
+  { title: "SALVADOR", slug: "salvador" },
+  { title: "SCANDI", slug: "scandi" },
+
+  // 🔻 Тут добавишь следующие 5 коллекций (по аналогии)
+  // { title: "NEWCOLL", slug: "newcoll" },
 ];
 
-export const COLLECTION_ITEMS = [
-  { label: "Bergen Dark", value: "bergen_dark" },
-  { label: "Bergen Dub", value: "bergen_dub" },
-  { label: "Bergen Latte", value: "bergen_latte" },
-  { label: "Bergen White", value: "bergen_white" },
-  { label: "Bryce", value: "bryce" },
-  { label: "Florence Bianco", value: "florence_bianco" },
-  { label: "Florence Ciliegio", value: "florence_ciliegio" },
-  { label: "Makassar Dub", value: "makassar_dub" },
-  { label: "Modena", value: "modena" },
+// ✅ разделы/категории (то что у тебя в sidebar)
+export const CATS: CatItem[] = [
+  { title: "Фасады", slug: "fasadi" },
+  { title: "Комоды", slug: "komody" },
+  { title: "Кровати", slug: "krovati" },
+  { title: "Полки", slug: "polki" },
+  { title: "Шкафы", slug: "shkafy" },
+  { title: "Стеллажи", slug: "stellaji" },
+  { title: "Столы", slug: "stoli" },
+  { title: "Тумбы", slug: "tumby" },
+  { title: "Вешалки", slug: "veshalki" },
+  { title: "Витрины", slug: "vitrini" },
+  { title: "Зеркала", slug: "zerkala" },
 ];
 
-export const TYPE_ITEMS = [
-  { label: "Комоды", value: "komody" },
-  { label: "Консоли", value: "konsoli" },
-  { label: "Столы обеденные", value: "stoly_obed" },
-  { label: "Столы письменные", value: "stoly_pism" },
-  { label: "Стулья и кресла", value: "stulya_kresla" },
-  { label: "Тумбы ТВ", value: "tumby_tv" },
-  { label: "Шкафы", value: "shkafy" },
-  { label: "Витрины", value: "vitriny" },
-  { label: "Библиотеки и стеллажи", value: "stellazhi" },
-  { label: "Полукресла", value: "polukresla" },
-];
+// ------------------------------------------------------
+// ✅ Текущая коллекция SCANDI
+// ------------------------------------------------------
 
-// ✅ локальные демо-фото (лежат в public/demo/products)
-const DEMO_IMAGES = [
-  "/demo/products/p1.jpg",
-  "/demo/products/p2.jpg",
-  "/demo/products/p3.jpg",
-  "/demo/products/p4.jpg",
-  "/demo/products/p5.jpg",
-  "/demo/products/p6.jpg",
-  "/demo/products/p7.jpg",
-  "/demo/products/p8.jpg",
-  "/demo/products/p9.jpg",
-  "/demo/products/p10.jpg",
-  "/demo/products/p11.jpg",
-  "/demo/products/p12.jpg",
-];
-
-// ✅ мок — сразу с полями под будущий Strapi
-export const CATALOG_MOCK: CatalogProduct[] = Array.from({ length: 24 }).map(
-  (_, i) => {
-    const brand = BRANDS[i % BRANDS.length].slug;
-    const category = CATS[i % CATS.length].slug;
-
-    const menu = MENU_ITEMS[i % MENU_ITEMS.length].value;
-    const collection = COLLECTION_ITEMS[i % COLLECTION_ITEMS.length].value;
-    const type = TYPE_ITEMS[i % TYPE_ITEMS.length].value;
-
-    const baseRub = 41800 + i * 3500;
-
-    return {
-      id: String(i + 1),
-      title:
-        category === "bedrooms"
-          ? `Тумба прикроватная ${i + 1}`
-          : category === "living"
-            ? `Витрина ${i + 1}`
-            : category === "youth"
-              ? `Шкаф молодежный ${i + 1}`
-              : category === "hallway"
-                ? `Прихожая модуль ${i + 1}`
-                : `Стол ${i + 1}`,
-
-      price_rub: baseRub,
-      price_uzs: Math.round(baseRub * 140),
-
-      badge: i % 6 === 0 ? "Хит продаж" : i % 9 === 0 ? "Новинка" : "",
-      image: DEMO_IMAGES[i % DEMO_IMAGES.length],
-
-      brand,
-      category,
-
-      menu,
-      collection,
-      type,
-
-      isCollection: false,
-    };
-  },
-);
-
-// =====================================================
-// ✅ ВИТРИНЫ-КОЛЛЕКЦИИ (покупаются как 1 товар)
-// =====================================================
-
-export const COLLECTION_PRODUCTS: CollectionShowcaseProduct[] = [
-  // bedrooms
-  {
-    id: "col-amber-bedrooms",
-    title: "Спальня «АМБЕР»",
-    price_rub: 48900,
-    price_uzs: 6852000,
-    badge: "Коллекция",
-    image: "/mega/bedrooms/amber/main.jpg",
-    isCollection: true,
-    brand: "amber",
-    category: "bedrooms",
-  },
-  {
-    id: "col-scandi-bedrooms",
-    title: "Спальня «СКАНДИ»",
-    price_rub: 47900,
-    price_uzs: 6710000,
-    badge: "Коллекция",
-    image: "/mega/bedrooms/scandi/main.jpg",
-    isCollection: true,
+const BASE_PRODUCTS: CatalogProduct[] = [
+  makeProduct({
+    id: "scandi-fasadi-set",
+    title: "SCANDI · Фасады",
     brand: "scandi",
-    category: "bedrooms",
-  },
-  {
-    id: "col-elizabeth-bedrooms",
-    title: "Спальня «ЭЛИЗАБЕТ»",
-    price_rub: 51200,
-    price_uzs: 7168000,
-    badge: "Коллекция",
-    image: "/mega/bedrooms/elizabeth/main.jpg",
-    isCollection: true,
-    brand: "elizabeth",
-    category: "bedrooms",
-  },
-  {
-    id: "col-salvador-bedrooms",
-    title: "Спальня «САЛЬВАДОР»",
-    price_rub: 53500,
-    price_uzs: 7490000,
-    badge: "Коллекция",
-    image: "/mega/bedrooms/salvador/main.jpg",
-    isCollection: true,
-    brand: "salvador",
-    category: "bedrooms",
-  },
-  {
-    id: "col-pitti-bedrooms",
-    title: "Спальня «ПИТТИ»",
-    price_rub: 50500,
-    price_uzs: 7070000,
-    badge: "Коллекция",
-    image: "/mega/bedrooms/pitti/main.jpg",
-    isCollection: true,
-    brand: "pitti",
-    category: "bedrooms",
-  },
-  {
-    id: "col-buongiorno-bedrooms",
-    title: "Спальня «БОНЖОРНО»",
-    price_rub: 49800,
-    price_uzs: 6972000,
-    badge: "Коллекция",
-    image: "/mega/bedrooms/buongiorno/main.jpg",
-    isCollection: true,
-    brand: "buongiorno",
-    category: "bedrooms",
-  },
+    cat: "fasadi",
+    basePath: "/products/scandi/fasadi",
+    gallery: makeGallery("/products/scandi/fasadi", 5),
+    priceRUB: 89000,
+    priceUZS: 12900000,
+  }),
 
-  // living
-  {
-    id: "col-scandi-living",
-    title: "Гостиная «СКАНДИ»",
-    price_rub: 45900,
-    price_uzs: 6426000,
-    badge: "Коллекция",
-    image: "/mega/living/scandi/main.jpg",
-    isCollection: true,
+  makeProduct({
+    id: "scandi-komody-komod-shirokiy",
+    title: "Комод широкий",
     brand: "scandi",
-    category: "living",
-  },
-  {
-    id: "col-pitti-living",
-    title: "Гостиная «ПАТТИ»",
-    price_rub: 47200,
-    price_uzs: 6608000,
-    badge: "Коллекция",
-    image: "/mega/living/pitti/main.jpg",
-    isCollection: true,
-    brand: "pitti",
-    category: "living",
-  },
-  {
-    id: "col-salvador-living",
-    title: "Гостиная «САЛЬВАДОР»",
-    price_rub: 52500,
-    price_uzs: 7350000,
-    badge: "Коллекция",
-    image: "/mega/living/salvador/main.jpg",
-    isCollection: true,
-    brand: "salvador",
-    category: "living",
-  },
-  {
-    id: "col-buongiorno-living",
-    title: "Гостиная «BERGEN WHITE»",
-    price_rub: 49900,
-    price_uzs: 6986000,
-    badge: "Коллекция",
-    image: "/mega/living/buongiorno/main.jpg",
-    isCollection: true,
-    brand: "buongiorno",
-    category: "living",
-  },
+    cat: "komody",
+    basePath: "/products/scandi/komody/komod-shirokiy",
+    gallery: makeGallery("/products/scandi/komody/komod-shirokiy", 2),
+    priceRUB: 69900,
+    priceUZS: 9800000,
+  }),
+  makeProduct({
+    id: "scandi-komody-komod-standart",
+    title: "Комод стандарт",
+    brand: "scandi",
+    cat: "komody",
+    basePath: "/products/scandi/komody/komod-standart",
+    gallery: makeGallery("/products/scandi/komody/komod-standart", 2),
+    priceRUB: 59900,
+    priceUZS: 8500000,
+  }),
 
-  // youth
-  {
-    id: "col-scandi-youth",
-    title: "Молодежная «СКАНДИ»",
-    price_rub: 44100,
-    price_uzs: 6174000,
-    badge: "Коллекция",
-    image: "/mega/youth/scandi/main.jpg",
-    isCollection: true,
+  makeProduct({
+    id: "scandi-krovati-krovati-max",
+    title: "Кровать MAX",
     brand: "scandi",
-    category: "youth",
-  },
-  {
-    id: "col-elizabeth-youth",
-    title: "Молодежная «ЭЛИЗАБЕТ»",
-    price_rub: 46500,
-    price_uzs: 6510000,
-    badge: "Коллекция",
-    image: "/mega/youth/elizabeth/main.jpg",
-    isCollection: true,
-    brand: "elizabeth",
-    category: "youth",
-  },
+    cat: "krovati",
+    basePath: "/products/scandi/krovati/krovati-max",
+    gallery: makeGallery("/products/scandi/krovati/krovati-max", 9),
+    priceRUB: 149900,
+    priceUZS: 21500000,
+  }),
+  makeProduct({
+    id: "scandi-krovati-krovati-min",
+    title: "Кровать MIN",
+    brand: "scandi",
+    cat: "krovati",
+    basePath: "/products/scandi/krovati/krovati-min",
+    gallery: makeGallery("/products/scandi/krovati/krovati-min", 5),
+    priceRUB: 129900,
+    priceUZS: 18900000,
+  }),
+
+  makeProduct({
+    id: "scandi-polki-set",
+    title: "Полки (набор)",
+    brand: "scandi",
+    cat: "polki",
+    basePath: "/products/scandi/polki",
+    gallery: makeGallery("/products/scandi/polki", 5),
+    priceRUB: 19900,
+    priceUZS: 2900000,
+  }),
+
+  makeProduct({
+    id: "scandi-shkafy-shkaf-big",
+    title: "Шкаф BIG",
+    brand: "scandi",
+    cat: "shkafy",
+    basePath: "/products/scandi/shkafy/shkaf-big",
+    gallery: makeGallery("/products/scandi/shkafy/shkaf-big", 18),
+    priceRUB: 189900,
+    priceUZS: 27500000,
+  }),
+  makeProduct({
+    id: "scandi-shkafy-shkaf-bigger",
+    title: "Шкаф BIGGER",
+    brand: "scandi",
+    cat: "shkafy",
+    basePath: "/products/scandi/shkafy/shkaf-bigger",
+    gallery: makeGallery("/products/scandi/shkafy/shkaf-bigger", 6),
+    priceRUB: 209900,
+    priceUZS: 30500000,
+  }),
+  makeProduct({
+    id: "scandi-shkafy-shkaf-max",
+    title: "Шкаф MAX",
+    brand: "scandi",
+    cat: "shkafy",
+    basePath: "/products/scandi/shkafy/shkaf-max",
+    gallery: makeGallery("/products/scandi/shkafy/shkaf-max", 14),
+    priceRUB: 199900,
+    priceUZS: 29500000,
+  }),
+  makeProduct({
+    id: "scandi-shkafy-shkaf-min",
+    title: "Шкаф MIN",
+    brand: "scandi",
+    cat: "shkafy",
+    basePath: "/products/scandi/shkafy/shkaf-min",
+    gallery: makeGallery("/products/scandi/shkafy/shkaf-min", 10),
+    priceRUB: 159900,
+    priceUZS: 23900000,
+  }),
+  makeProduct({
+    id: "scandi-shkafy-shkaf-standart",
+    title: "Шкаф STANDARD",
+    brand: "scandi",
+    cat: "shkafy",
+    basePath: "/products/scandi/shkafy/shkaf-standart",
+    gallery: makeGallery("/products/scandi/shkafy/shkaf-standart", 5),
+    priceRUB: 169900,
+    priceUZS: 24900000,
+  }),
+
+  makeProduct({
+    id: "scandi-stellaji-stellaj-shirokiy",
+    title: "Стеллаж широкий",
+    brand: "scandi",
+    cat: "stellaji",
+    basePath: "/products/scandi/stellaji/stellaj-shirokiy",
+    gallery: makeGallery("/products/scandi/stellaji/stellaj-shirokiy", 2),
+    priceRUB: 49900,
+    priceUZS: 7200000,
+  }),
+  makeProduct({
+    id: "scandi-stellaji-stellaj-standart",
+    title: "Стеллаж стандарт",
+    brand: "scandi",
+    cat: "stellaji",
+    basePath: "/products/scandi/stellaji/stellaj-standart",
+    gallery: makeGallery("/products/scandi/stellaji/stellaj-standart", 4),
+    priceRUB: 45900,
+    priceUZS: 6600000,
+  }),
+
+  makeProduct({
+    id: "scandi-stoli-stoli-jurnalnie",
+    title: "Стол журнальный",
+    brand: "scandi",
+    cat: "stoli",
+    basePath: "/products/scandi/stoli/stoli-jurnalnie",
+    gallery: makeGallery("/products/scandi/stoli/stoli-jurnalnie", 1),
+    priceRUB: 17900,
+    priceUZS: 2600000,
+  }),
+  makeProduct({
+    id: "scandi-stoli-stoli-standart",
+    title: "Стол стандарт",
+    brand: "scandi",
+    cat: "stoli",
+    basePath: "/products/scandi/stoli/stoli-standart",
+    gallery: makeGallery("/products/scandi/stoli/stoli-standart", 8),
+    priceRUB: 39900,
+    priceUZS: 5800000,
+  }),
+
+  makeProduct({
+    id: "scandi-tumby-tumbi-shirokie",
+    title: "Тумба широкая",
+    brand: "scandi",
+    cat: "tumby",
+    basePath: "/products/scandi/tumby/tumbi-shirokie",
+    gallery: makeGallery("/products/scandi/tumby/tumbi-shirokie", 2),
+    priceRUB: 44900,
+    priceUZS: 6500000,
+  }),
+  makeProduct({
+    id: "scandi-tumby-tumbi-standart",
+    title: "Тумба стандарт",
+    brand: "scandi",
+    cat: "tumby",
+    basePath: "/products/scandi/tumby/tumbi-standart",
+    gallery: makeGallery("/products/scandi/tumby/tumbi-standart", 8),
+    priceRUB: 39900,
+    priceUZS: 5800000,
+  }),
+  makeProduct({
+    id: "scandi-tumby-tumbi-tv",
+    title: "Тумба TV",
+    brand: "scandi",
+    cat: "tumby",
+    basePath: "/products/scandi/tumby/tumbi-tv",
+    gallery: makeGallery("/products/scandi/tumby/tumbi-tv", 2),
+    priceRUB: 55900,
+    priceUZS: 8100000,
+  }),
+
+  makeProduct({
+    id: "scandi-veshalki-set",
+    title: "Вешалка",
+    brand: "scandi",
+    cat: "veshalki",
+    basePath: "/products/scandi/veshalki",
+    gallery: makeGallery("/products/scandi/veshalki", 2),
+    priceRUB: 12900,
+    priceUZS: 1900000,
+  }),
+
+  makeProduct({
+    id: "scandi-vitrini-vitrina-max",
+    title: "Витрина MAX",
+    brand: "scandi",
+    cat: "vitrini",
+    basePath: "/products/scandi/vitrini/vitrina-max",
+    gallery: makeGallery("/products/scandi/vitrini/vitrina-max", 10),
+    priceRUB: 99900,
+    priceUZS: 14500000,
+  }),
+  makeProduct({
+    id: "scandi-vitrini-vitrina-min",
+    title: "Витрина MIN",
+    brand: "scandi",
+    cat: "vitrini",
+    basePath: "/products/scandi/vitrini/vitrina-min",
+    gallery: makeGallery("/products/scandi/vitrini/vitrina-min", 6),
+    priceRUB: 79900,
+    priceUZS: 11800000,
+  }),
+
+  makeProduct({
+    id: "scandi-zerkala-zerkala-dlina",
+    title: "Зеркало (длина)",
+    brand: "scandi",
+    cat: "zerkala",
+    basePath: "/products/scandi/zerkala/zerkala-dlina",
+    gallery: makeGallery("/products/scandi/zerkala/zerkala-dlina", 1),
+    priceRUB: 14900,
+    priceUZS: 2200000,
+  }),
+  makeProduct({
+    id: "scandi-zerkala-zerkala-shirina",
+    title: "Зеркало (ширина)",
+    brand: "scandi",
+    cat: "zerkala",
+    basePath: "/products/scandi/zerkala/zerkala-shirina",
+    gallery: makeGallery("/products/scandi/zerkala/zerkala-shirina", 1),
+    priceRUB: 14900,
+    priceUZS: 2200000,
+  }),
+  makeProduct({
+    id: "scandi-zerkala-zerkala-standart",
+    title: "Зеркало стандарт",
+    brand: "scandi",
+    cat: "zerkala",
+    basePath: "/products/scandi/zerkala/zerkala-standart",
+    gallery: makeGallery("/products/scandi/zerkala/zerkala-standart", 1),
+    priceRUB: 13900,
+    priceUZS: 2050000,
+  }),
+
+  // ------------------------------------------------------
+  // 🔻 ДОБАВЛЕНИЕ ЕЩЁ 5 КОЛЛЕКЦИЙ
+  // 1) добавь brand в BRANDS (slug = имя папки в public/products/<slug>/...)
+  // 2) ниже вставляй блоки makeProduct(...) по аналогии со SCANDI
+  //    и меняй basePath на "/products/<brand>/<cat>/..."
+  // ------------------------------------------------------
 ];
 
-// ✅ единая база: и товары, и витрины
-export const CATALOG_ALL: AnyProduct[] = [...CATALOG_MOCK, ...COLLECTION_PRODUCTS];
+// ✅ Экспорт массива с совместимыми полями price_rub/price_uzs
+export const CATALOG_MOCK: CatalogProductCompat[] = BASE_PRODUCTS.map((p) => ({
+  ...p,
+  price_rub: p.priceRUB,
+  price_uzs: p.priceUZS,
+}));
 
-// ✅ чтобы /cart и любая логика по id работали без правок
-export const CATALOG_BY_ID = new Map<string, AnyProduct>(
-  CATALOG_ALL.map((p) => [p.id, p]),
+// ✅ ВАЖНО: CATALOG_BY_ID как Map, чтобы работало .get(...)
+export const CATALOG_BY_ID = new Map<string, CatalogProductCompat>(
+  CATALOG_MOCK.map((p) => [String(p.id), p]),
 );

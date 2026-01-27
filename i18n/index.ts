@@ -9,12 +9,19 @@ export function getDict(lang: Lang) {
   return dictionaries[lang] ?? dictionaries.ru;
 }
 
-export function t(dict: any, key: string): string {
-  return key.split(".").reduce((o, k) => o?.[k], dict) ?? key;
+function getByPath(obj: any, path: string) {
+  return path.split(".").reduce((o, k) => (o ? o[k] : undefined), obj);
 }
 
-// ✅ добавь это
-export function tF(dict: any, key: string, fallback: string): string {
-  const v = key.split(".").reduce((o, k) => o?.[k], dict);
+export function t(dict: any, key: unknown): string {
+  if (typeof key !== "string" || !key.trim()) return "";
+  const v = getByPath(dict, key);
+  return typeof v === "string" ? v : key;
+}
+
+// ✅ безопасный fallback
+export function tF(dict: any, key: unknown, fallback: string): string {
+  if (typeof key !== "string" || !key.trim()) return fallback;
+  const v = getByPath(dict, key);
   return typeof v === "string" && v.trim() ? v : fallback;
 }

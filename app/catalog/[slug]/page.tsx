@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import ProductClient from "@/app/product/[id]/ui/ProductClient";
 
 import { megaCategories, MEGA_PREVIEWS } from "@/app/lib/headerData";
-import { CATALOG_MOCK, CATALOG_BY_ID } from "@/app/lib/mock/catalog-products"; // ✅ добавили CATALOG_BY_ID
+import { CATALOG_MOCK, CATALOG_BY_ID } from "@/app/lib/mock/catalog-products";
 
 function titleCase(s: string) {
   if (!s) return s;
@@ -13,6 +13,35 @@ function parseCollectionSlug(slug: string) {
   const m = slug?.match(/^collection-([a-z0-9-]+)-([a-z0-9-]+)$/i);
   if (!m) return null;
   return { brand: m[1], category: m[2] };
+}
+
+// ✅ детерминированный "рандом" (4 модуля не прыгают)
+function xfnv1a(str: string) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function mulberry32(seed: number) {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function pickDeterministic<T>(items: T[], key: string, count: number) {
+  if (items.length <= count) return items;
+  const rand = mulberry32(xfnv1a(key));
+  const pool = [...items];
+  const out: T[] = [];
+  while (out.length < count && pool.length) {
+    const idx = Math.floor(rand() * pool.length);
+    out.push(pool.splice(idx, 1)[0]);
+  }
+  return out;
 }
 
 export default async function CatalogSlugPage({
@@ -37,29 +66,31 @@ export default async function CatalogSlugPage({
     found?.it.label ?? titleCase(parsed.brand ?? "Коллекция");
 
   const preview = MEGA_PREVIEWS[href];
-
-  const products = (CATALOG_MOCK as any[]).filter(
-    (p) => p.brand === parsed.brand && p.category === parsed.category,
-  );
-
-  if (!products.length) return notFound();
-
   const collectionId = `col-${parsed.brand}-${parsed.category}`;
 
-  // ✅ ВАЖНО: цену берем из витрины (COLLECTION_PRODUCTS уже лежит в CATALOG_BY_ID)
+  // ✅ строго: только модули этой витрины
+  const modulesAll = (CATALOG_MOCK as any[]).filter(
+    (p) => p.collectionKey === collectionId,
+  );
+  if (!modulesAll.length) return notFound();
+
+  // ✅ цену берём из витрины
   const showcase = CATALOG_BY_ID.get(collectionId) as any;
 
   const price_uzs =
     Number(showcase?.price_uzs ?? 0) ||
-    Math.min(...products.map((x) => Number(x.price_uzs ?? 0)));
+    Math.min(...modulesAll.map((x) => Number(x.price_uzs ?? 0)));
 
   const price_rub =
     Number(showcase?.price_rub ?? 0) ||
-    Math.min(...products.map((x) => Number(x.price_rub ?? 0)));
+    Math.min(...modulesAll.map((x) => Number(x.price_rub ?? 0)));
 
-  const gallery = [preview?.main, preview?.a, preview?.b, products[0]?.image]
+  const gallery = [preview?.main, preview?.a, preview?.b, modulesAll[0]?.image]
     .filter(Boolean)
     .map(String);
+
+  // ✅ 4 модуля → в блок "Товары коллекции" внутри ProductClient
+  const modules4 = pickDeterministic(modulesAll, collectionId, 4);
 
   const product = {
     id: collectionId,
@@ -67,14 +98,14 @@ export default async function CatalogSlugPage({
     badge: "Коллекция",
     href,
     sku: collectionId.toUpperCase(),
-    image: preview?.main || products[0].image,
-    gallery: gallery.length ? gallery : [products[0].image],
+    image: preview?.main || modulesAll[0].image,
+    gallery: gallery.length ? gallery : [modulesAll[0].image],
 
     price_rub,
     price_uzs,
 
     description:
-      "Это витрина коллекции. Вы можете добавить коллекцию в корзину как единый товар, либо открыть конкретный товар ниже и посмотреть характеристики.",
+      "Это витрина коллекции. Вы можете добавить коллекцию в корзину как единый товар, либо выбрать модуль ниже и посмотреть характеристики.",
 
     extra: {
       article: collectionId.toUpperCase(),
@@ -83,7 +114,7 @@ export default async function CatalogSlugPage({
       material: "—",
     },
 
-    related: products.slice(0, 12).map((x) => ({
+    related: modules4.map((x) => ({
       id: String(x.id),
       title: x.title,
       image: x.image,

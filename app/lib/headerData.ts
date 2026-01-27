@@ -68,36 +68,12 @@ export const megaCategories: MegaCategory[] = [
     fallback: "СПАЛЬНИ",
     href: "/category/bedrooms",
     items: [
-      {
-        labelKey: "brand.amber",
-        fallback: "АМБЕР",
-        href: makeCollectionHref("amber", "bedrooms"),
-      },
-      {
-        labelKey: "brand.scandi",
-        fallback: "СКАНДИ",
-        href: makeCollectionHref("scandi", "bedrooms"),
-      },
-      {
-        labelKey: "brand.elizabeth",
-        fallback: "ЭЛИЗАБЕТ",
-        href: makeCollectionHref("elizabeth", "bedrooms"),
-      },
-      {
-        labelKey: "brand.salvador",
-        fallback: "САЛЬВАДОР",
-        href: makeCollectionHref("salvador", "bedrooms"),
-      },
-      {
-        labelKey: "brand.pitti",
-        fallback: "ПИТТИ",
-        href: makeCollectionHref("pitti", "bedrooms"),
-      },
-      {
-        labelKey: "brand.buongiorno",
-        fallback: "БОНЖОРНО",
-        href: makeCollectionHref("buongiorno", "bedrooms"),
-      },
+      { labelKey: "brand.amber", fallback: "АМБЕР", href: makeCollectionHref("amber", "bedrooms") },
+      { labelKey: "brand.scandi", fallback: "СКАНДИ", href: makeCollectionHref("scandi", "bedrooms") },
+      { labelKey: "brand.elizabeth", fallback: "ЭЛИЗАБЕТ", href: makeCollectionHref("elizabeth", "bedrooms") },
+      { labelKey: "brand.salvador", fallback: "САЛЬВАДОР", href: makeCollectionHref("salvador", "bedrooms") },
+      { labelKey: "brand.pitti", fallback: "ПИТТИ", href: makeCollectionHref("pitti", "bedrooms") },
+      { labelKey: "brand.buongiorno", fallback: "БОНЖОРНО", href: makeCollectionHref("buongiorno", "bedrooms") },
     ],
   },
   {
@@ -106,73 +82,42 @@ export const megaCategories: MegaCategory[] = [
     fallback: "ГОСТИНЫЕ",
     href: "/category/living",
     items: [
-      {
-        labelKey: "brand.scandi",
-        fallback: "СКАНДИ",
-        href: makeCollectionHref("scandi", "living"),
-      },
-      {
-        labelKey: "brand.pitti_alt",
-        fallback: "ПАТТИ",
-        href: makeCollectionHref("pitti", "living"),
-      },
-      {
-        labelKey: "brand.salvador",
-        fallback: "САЛЬВАДОР",
-        href: makeCollectionHref("salvador", "living"),
-      },
-      {
-        labelKey: "brand.bergen_white",
-        fallback: "BERGEN WHITE",
-        href: makeCollectionHref("buongiorno", "living"),
-      },
+      { labelKey: "brand.scandi", fallback: "СКАНДИ", href: makeCollectionHref("scandi", "living") },
+      { labelKey: "brand.pitti_alt", fallback: "ПАТТИ", href: makeCollectionHref("pitti", "living") },
+      { labelKey: "brand.salvador", fallback: "САЛЬВАДОР", href: makeCollectionHref("salvador", "living") },
+      { labelKey: "brand.bergen_white", fallback: "BERGEN WHITE", href: makeCollectionHref("buongiorno", "living") },
     ],
   },
   {
     key: "hallway",
-    labelKey: "header.mega.youth",
-    fallback: "МОЛОДЕЖНЫЕ",
-    href: "/category/youth",
+    labelKey: "header.mega.hallway",
+    fallback: "ПРИХОЖИЕ",
+    href: "/category/hallway",
     items: [
-      {
-        labelKey: "brand.scandi",
-        fallback: "СКАНДИ",
-        href: makeCollectionHref("scandi", "youth"),
-      },
-      {
-        labelKey: "brand.elizabeth",
-        fallback: "ЭЛИЗАБЕТ",
-        href: makeCollectionHref("elizabeth", "youth"),
-      },
+      { labelKey: "common.inDev", fallback: "В РАЗРАБОТКЕ", href: "/category/hallway" },
     ],
   },
   {
-    key: "office",
-    labelKey: "header.mega.hallway",
-    fallback: "ПРИХОЖИЕ",
-    href: "/category/office",
+    key: "tables",
+    labelKey: "header.mega.tables",
+    fallback: "СТОЛЫ И СТУЛЬЯ",
+    href: "/category/tables",
     items: [
-      {
-        labelKey: "common.inDev",
-        fallback: "В РАЗРАБОТКЕ",
-        href: "/category/office",
-      },
+      { labelKey: "common.inDev", fallback: "В РАЗРАБОТКЕ", href: "/category/tables" },
     ],
   },
   {
     key: "wardrobes",
-    labelKey: "header.mega.tables",
-    fallback: "СТОЛЫ И СТУЛЬЯ",
-    href: "/category/wardrobes",
+    labelKey: "header.mega.youth",
+    fallback: "МОЛОДЕЖНЫЕ",
+    href: "/category/youth",
     items: [
-      {
-        labelKey: "common.inDev",
-        fallback: "В РАЗРАБОТКЕ",
-        href: "/catalog/bryce",
-      },
+      { labelKey: "brand.scandi", fallback: "СКАНДИ", href: makeCollectionHref("scandi", "youth") },
+      { labelKey: "brand.elizabeth", fallback: "ЭЛИЗАБЕТ", href: makeCollectionHref("elizabeth", "youth") },
     ],
   },
 ];
+
 
 /* =========================
    MEGA MENU PREVIEWS (1 big + 2 small)

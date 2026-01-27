@@ -27,6 +27,7 @@ type GlobalFromStrapi = {
     label?: string | null;
     href?: string | null;
     isExternal?: boolean | null;
+    isActive?: boolean | null; // ✅ скрывать/показывать ссылку
   }> | null;
   phones?: Array<{
     id?: number;
@@ -36,20 +37,29 @@ type GlobalFromStrapi = {
   addresses?: Array<{
     id?: number;
     region?: RegionKey | string | null;
+
+    // RU
     city?: string | null;
     addressLine?: string | null;
     workTime?: string | null;
+
+    // UZ (вариант 1)
+    city_uz?: string | null;
+    addressLine_uz?: string | null;
+    workTime_uz?: string | null;
+
     mapUrl?: string | null;
   }> | null;
 };
 
-function getRegionLabel(dict: any, meta: any): string {
-  // новый формат: { labelKey, fallback, ... }
-  if (meta && typeof meta === "object" && "labelKey" in meta) {
-    return tF(dict, String(meta.labelKey), String(meta.fallback ?? ""));
-  }
-  // старый формат: { label, ... }
-  return String(meta?.label ?? "");
+function normalizeRegionKey(x: any): RegionKey {
+  return x === "ru" ? "ru" : "uz";
+}
+
+// ✅ защита от падений, если key вдруг undefined/null
+function safeTF(dict: any, key: any, fallback: string) {
+  const k = typeof key === "string" ? key : "";
+  return tF(dict, k, fallback);
 }
 
 export default function Header({
@@ -58,7 +68,7 @@ export default function Header({
   global?: GlobalFromStrapi | null;
 }) {
   const { region, setRegion, lang, setLang } = useRegionLang();
-  const dict = useMemo(() => getDict(lang), [lang]);
+  const dict = useMemo(() => getDict(lang as any), [lang]);
 
   const [mapOpen, setMapOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState("");
@@ -66,10 +76,42 @@ export default function Header({
   const [callOpen, setCallOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // ✅ top links из Strapi (если есть), иначе fallback
+  const regionKey = normalizeRegionKey(region);
+  const regionMeta: any =
+    (REGION_DATA as any)[regionKey] ?? (REGION_DATA as any).uz;
+
+  /**
+   * ✅ TOP LINKS:
+   * - если есть Strapi -> пытаемся распознать label и подставить key (чтобы переводилось)
+   * - иначе -> берём fallback из headerData (labelKey/fallback)
+   */
   const topLinks = useMemo(() => {
-    const fromCms = (global?.topLinks ?? [])
+    const normalize = (s: string) =>
+      s
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .replace(/[«»"']/g, "")
+        .trim();
+
+    const KEY_BY_LABEL: Record<string, string> = {
+      [normalize("Каталог")]: "header.top.catalog",
+      [normalize("О компании")]: "header.top.about",
+      [normalize("Новости")]: "header.top.news",
+      [normalize("Контакты")]: "header.top.contacts",
+      [normalize("Сотрудничество")]: "header.top.cooperation",
+      [normalize("Акции")]: "header.top.sale",
+
+      [normalize("CATALOG")]: "header.top.catalog",
+      [normalize("ABOUT")]: "header.top.about",
+      [normalize("NEWS")]: "header.top.news",
+      [normalize("CONTACTS")]: "header.top.contacts",
+      [normalize("COOPERATION")]: "header.top.cooperation",
+      [normalize("SALE")]: "header.top.sale",
+    };
+
+    const fromCmsRaw = (global?.topLinks ?? [])
       .filter(Boolean)
+      .filter((x) => x?.isActive !== false) // ✅ скрываем если isActive=false
       .map((x) => ({
         label: (x?.label ?? "").trim(),
         href: (x?.href ?? "").trim(),
@@ -77,72 +119,91 @@ export default function Header({
       }))
       .filter((x) => x.label && x.href);
 
-    // fallback из headerData, если CMS пустой
-    // (у тебя сейчас headerData может быть старым или уже новым — страхуемся)
-    const fallback = (TOPLINKS_FALLBACK as any[]).map((x) => ({
-      label: String(x?.title ?? x?.label ?? x?.fallback ?? "").trim(),
+    if (fromCmsRaw.length) {
+      return fromCmsRaw.map((x) => {
+        const k = KEY_BY_LABEL[normalize(x.label)];
+        return {
+          labelKey: k ?? "",
+          fallback: x.label,
+          href: x.href,
+          isExternal: x.isExternal,
+        };
+      });
+    }
+
+    return (TOPLINKS_FALLBACK as any[]).map((x) => ({
+      labelKey: String(x?.labelKey ?? ""),
+      fallback: String(x?.fallback ?? x?.label ?? x?.title ?? "").trim(),
       href: String(x?.href ?? "").trim(),
-      isExternal: false,
+      isExternal: Boolean(x?.isExternal),
     }));
-
-    return fromCms.length ? fromCms : fallback;
   }, [global?.topLinks]);
-
-  const regionMeta: any =
-    (REGION_DATA as any)[region] ?? (REGION_DATA as any).uz;
 
   // ✅ phone из Strapi по региону, иначе REGION_DATA
   const phone = useMemo(() => {
     const p = (global?.phones ?? []).find(
-      (x) => String(x?.region) === region,
+      (x) => String(x?.region) === regionKey,
     )?.phone;
 
-    const v =
-      p && String(p).trim()
-        ? String(p).trim()
-        : String(regionMeta?.phone ?? "");
+    return p && String(p).trim()
+      ? String(p).trim()
+      : String(regionMeta?.phone ?? "");
+  }, [global?.phones, regionKey, regionMeta]);
 
-    return v;
-  }, [global?.phones, region, regionMeta]);
-
-  // ✅ addresses из Strapi по региону, иначе REGION_DATA
+  /**
+   * ✅ addresses (вариант 1):
+   * - RU берём из city/addressLine/workTime
+   * - UZ берём из city_uz/addressLine_uz/workTime_uz
+   * - если UZ-поля пустые — падаем обратно на RU (чтобы не было пустоты)
+   */
   const addresses = useMemo(() => {
+    const isUzLang = String(lang) === "uz";
+
     const list = (global?.addresses ?? [])
-      .filter((x) => String(x?.region) === region)
+      .filter((x) => String(x?.region) === regionKey)
       .map((x) => {
-        const city = (x?.city ?? "").trim();
-        const addr = (x?.addressLine ?? "").trim();
-        const work = (x?.workTime ?? "").trim();
+        const cityRaw = isUzLang ? x?.city_uz : x?.city;
+        const addrRaw = isUzLang ? x?.addressLine_uz : x?.addressLine;
+        const workRaw = isUzLang ? x?.workTime_uz : x?.workTime;
+
+        // если узбекские поля не заполнены — берём RU, чтобы не было пусто
+        const city = String(cityRaw ?? x?.city ?? "").trim();
+        const addr = String(addrRaw ?? x?.addressLine ?? "").trim();
+        const work = String(workRaw ?? x?.workTime ?? "").trim();
+
         const base = [city, addr].filter(Boolean).join(", ");
         return work ? `${base} — ${work}` : base;
       })
-      .filter(Boolean);
+      .filter((s) => String(s).trim().length > 0);
 
     const fallback = Array.isArray(regionMeta?.addresses)
       ? regionMeta.addresses
       : [];
 
     return list.length ? list : fallback;
-  }, [global?.addresses, region, regionMeta]);
+  }, [global?.addresses, regionKey, regionMeta, lang]);
 
-  // ✅ регион в шапке — переводим безопасно
-  const regionLabel = getRegionLabel(dict, regionMeta);
-  const regionTitle = String(regionLabel || "").toUpperCase();
-
-  const phonePrefix = String(regionMeta?.phonePrefix ?? "");
-
-  // ✅ CTA “Заказать звонок” — если из CMS нет, берём перевод
   const callCta =
     (global?.callCtaLabel ?? "").trim() ||
-    tF(dict, "header.call", "Заказать звонок");
+    safeTF(dict, "header.ui.callMe", "Заказать звонок");
+
+  const regionLabel = safeTF(
+    dict,
+    String(regionMeta?.labelKey ?? "region.uz"),
+    String(regionMeta?.fallback ?? "Узбекистан"),
+  );
+
+  const phonePrefix = String(regionMeta?.phonePrefix ?? "");
 
   return (
     <>
       <header className="w-full bg-white">
         <TopBar
+          dict={dict} // ✅ оставил как у тебя
           topLinks={topLinks}
           phone={phone}
-          regionTitle={regionTitle}
+          regionTitleKey={String(regionMeta?.labelKey ?? "region.uz")}
+          regionTitleFallback={String(regionMeta?.fallback ?? "Узбекистан")}
           addresses={addresses}
           callCtaLabel={callCta}
           onPickAddress={(a) => {
@@ -154,7 +215,7 @@ export default function Header({
         />
 
         <BrandRow
-          region={region}
+          region={regionKey}
           setRegion={setRegion}
           lang={lang}
           setLang={setLang}
@@ -174,7 +235,7 @@ export default function Header({
         onClose={() => setCallOpen(false)}
         regionLabel={regionLabel}
         phonePrefix={phonePrefix}
-        regionKey={region}
+        regionKey={regionKey}
         onSubmit={async (data) => {
           try {
             const res = await fetch("/api/call-request", {
@@ -201,7 +262,11 @@ export default function Header({
       <MobileMenu
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        links={topLinks}
+        links={topLinks.map((x) => ({
+          label: x.labelKey ? safeTF(dict, x.labelKey, x.fallback) : x.fallback,
+          href: x.href,
+          isExternal: x.isExternal,
+        }))}
       />
     </>
   );

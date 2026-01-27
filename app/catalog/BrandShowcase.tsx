@@ -9,7 +9,7 @@ const cn = (...s: Array<string | false | null | undefined>) =>
 type Brand = {
   title: string;
   slug: string;
-  image: string; // позже из Strapi
+  image: string;
 };
 
 const BRANDS: Brand[] = [
@@ -21,7 +21,7 @@ const BRANDS: Brand[] = [
   { title: "БОНЖОРНО", slug: "bonjorno", image: "/demo/brands/bonjorno.jpg" },
 ];
 
-const CATS = [
+const ROOMS = [
   { title: "Спальни", slug: "bedrooms" },
   { title: "Гостиные", slug: "living" },
   { title: "Молодежные", slug: "youth" },
@@ -34,7 +34,7 @@ export default function BrandShowcase() {
     <section className="mx-auto w-full max-w-[1200px] px-4 pb-10">
       <div className="mb-4 flex items-end justify-between">
         <h2 className="text-[18px] font-medium tracking-[-0.02em]">
-          Коллекции брендов
+          Коллекции моделей
         </h2>
         <Link
           href="/catalog"
@@ -50,7 +50,11 @@ export default function BrandShowcase() {
             key={b.slug}
             className="group relative overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)]"
           >
-            <Link href={`/catalog?brand=${b.slug}`} className="block">
+            {/* модель */}
+            <Link
+              href={`/catalog?model=${b.slug}&brand=${b.slug}`}
+              className="block"
+            >
               <div className="relative aspect-[16/10]">
                 <Image
                   src={b.image}
@@ -63,11 +67,13 @@ export default function BrandShowcase() {
                   <div className="text-white text-[14px] tracking-[0.22em] uppercase">
                     {b.title}
                   </div>
+
+                  {/* разделы */}
                   <div className="mt-2 flex flex-wrap gap-1.5">
-                    {CATS.map((c) => (
+                    {ROOMS.map((c) => (
                       <Link
                         key={c.slug}
-                        href={`/catalog?brand=${b.slug}&category=${c.slug}`}
+                        href={`/catalog?room=${c.slug}&model=${b.slug}&category=${c.slug}&brand=${b.slug}`}
                         className={cn(
                           "rounded-full border border-white/25 bg-white/10",
                           "px-2.5 py-1 text-[11px] text-white/90 backdrop-blur",

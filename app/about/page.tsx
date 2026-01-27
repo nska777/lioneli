@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Script from "next/script";
 import GSAPHeroSlider from "../components/home/GSAPHeroSlider";
+import I18nProbe from "../account/_components/dev/I18nProbe";
 
 export const metadata: Metadata = {
   title: "О компании — Lioneto",
@@ -20,7 +21,6 @@ export const metadata: Metadata = {
     follow: true,
   },
 };
-
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
 
@@ -36,7 +36,7 @@ export default function AboutPage() {
         src="https://unpkg.com/gsap@3.12.5/dist/ScrollTrigger.min.js"
         strategy="afterInteractive"
       />
-
+      {<I18nProbe />}
       <main className="bg-white text-black">
         <GSAPHeroSlider />
         <div className="mx-auto w-full max-w-[1200px] px-4">

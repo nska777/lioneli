@@ -19,24 +19,10 @@ import {
 
 import { useRegionLang } from "@/app/context/region-lang";
 import { useShopState } from "@/app/context/shop-state";
+import { formatPrice } from "@/app/lib/format/price";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
-
-function formatPrice(value: number, currency: "RUB" | "UZS") {
-  try {
-    const locale = currency === "RUB" ? "ru-RU" : "uz-UZ";
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(value);
-  } catch {
-    return currency === "RUB"
-      ? `${Math.round(value).toLocaleString("ru-RU")} ₽`
-      : `${Math.round(value).toLocaleString("ru-RU")} сум`;
-  }
-}
 
 type MegaPreview = {
   title: string;
@@ -95,12 +81,26 @@ export default function ProductClient({
   const shop = useShopState();
   const { isFav, toggleFav, isInCart, addToCart, removeFromCart } = shop;
 
-  const gallery = useMemo(() => {
+  // ✅ 1) нормализуем галерею
+  const galleryRaw = useMemo(() => {
     const g = Array.isArray(product.gallery)
       ? product.gallery.filter(Boolean)
       : [];
-    return g.length ? g : [product.image].filter(Boolean);
+    const base = g.length ? g : [product.image].filter(Boolean);
+    // уникальные
+    const uniq: string[] = [];
+    for (const src of base.map(String))
+      if (src && !uniq.includes(src)) uniq.push(src);
+    return uniq.length ? uniq : [product.image].filter(Boolean);
   }, [product.gallery, product.image]);
+
+  // ✅ 2) ВАЖНОЕ ТРЕБОВАНИЕ:
+  // Для МОДУЛЯ (обычного товара): максимум 3 изображения (1 основное + 0–2 мини)
+  // Для ВИТРИНЫ (коллекции): оставляем как есть (можно 4+)
+  const gallery = useMemo(() => {
+    if (product.isCollection) return galleryRaw;
+    return galleryRaw.slice(0, 3);
+  }, [galleryRaw, product.isCollection]);
 
   const [activeIdx, setActiveIdx] = useState(0);
   const [qty, setQty] = useState(1);
@@ -108,6 +108,23 @@ export default function ProductClient({
   // lightbox
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIdx, setLightboxIdx] = useState(0);
+
+  const maxLen = Math.max(1, gallery.length);
+
+  // ✅ Правка 1: при смене товара/галереи — сбрасываем состояния lightbox + индексы
+  useEffect(() => {
+    setActiveIdx(0);
+    setLightboxIdx(0);
+    setLightboxOpen(false);
+  }, [product.id]);
+
+  // ✅ если галерея стала короче — фиксируем activeIdx + lightboxIdx
+  useEffect(() => {
+    const last = Math.max(0, gallery.length - 1);
+    if (activeIdx > last) setActiveIdx(0);
+    if (lightboxIdx > last) setLightboxIdx(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gallery.length]);
 
   const fav = isFav(product.id);
   const inCart = isInCart(product.id);
@@ -120,18 +137,23 @@ export default function ProductClient({
     else addToCart(product.id, qty);
   };
 
-  const maxLen = Math.max(1, gallery.length);
-
   const nextMain = () => setActiveIdx((v) => (v + 1) % maxLen);
   const prevMain = () => setActiveIdx((v) => (v - 1 + maxLen) % maxLen);
 
+  // ✅ Правка 3: оставляем ТОЛЬКО одну openLightbox(idx) и синхроним индексы
   const openLightbox = (idx: number) => {
-    setLightboxIdx(idx);
+    setActiveIdx(idx); // синхроним main
+    setLightboxIdx(idx); // синхроним lightbox
     setLightboxOpen(true);
   };
 
   const nextLb = () => setLightboxIdx((v) => (v + 1) % maxLen);
   const prevLb = () => setLightboxIdx((v) => (v - 1 + maxLen) % maxLen);
+
+  // ✅ Правка 2: если лайтбокс открылся — держим его индекс равным activeIdx
+  useEffect(() => {
+    if (lightboxOpen) setLightboxIdx(activeIdx);
+  }, [lightboxOpen, activeIdx]);
 
   // esc закрывает, стрелки листают
   useEffect(() => {
@@ -153,6 +175,15 @@ export default function ProductClient({
 
   // ✅ для витрины коллекции скрываем правый блок "Коллекция"
   const showCollectionCard = hasCollection && !product.isCollection;
+
+  // ✅ миниатюры: 0–2 (а значит максимум 3 картинки всего)
+  const showThumbs = gallery.length > 1;
+  const thumbsCols =
+    gallery.length === 2
+      ? "grid-cols-2"
+      : gallery.length === 3
+        ? "grid-cols-3"
+        : "grid-cols-4";
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8">
@@ -234,6 +265,7 @@ export default function ProductClient({
         {/* LEFT */}
         <section>
           <div className="relative aspect-square overflow-hidden rounded-3xl bg-black/[0.03]">
+            {/* кликом по фото — открываем лайтбокс с текущим activeIdx */}
             <button
               type="button"
               onClick={() => openLightbox(activeIdx)}
@@ -250,6 +282,7 @@ export default function ProductClient({
               sizes="(max-width: 1024px) 100vw, 520px"
             />
 
+            {/* ✅ стрелки только если есть > 1 фото */}
             {gallery.length > 1 && (
               <>
                 <button
@@ -290,6 +323,7 @@ export default function ProductClient({
               </>
             )}
 
+            {/* кнопка maximize — тоже открывает текущий activeIdx */}
             <button
               type="button"
               onClick={(e) => {
@@ -309,33 +343,36 @@ export default function ProductClient({
             </button>
           </div>
 
-          <div className="mt-3 grid grid-cols-4 gap-2">
-            {gallery.slice(0, 4).map((src, i) => {
-              const active = i === activeIdx;
-              return (
-                <button
-                  key={`${src}-${i}`}
-                  type="button"
-                  onClick={() => setActiveIdx(i)}
-                  className={cn(
-                    "cursor-pointer relative aspect-square overflow-hidden rounded-2xl bg-black/[0.03] transition",
-                    active
-                      ? "ring-2 ring-black/20"
-                      : "hover:ring-2 hover:ring-black/10",
-                  )}
-                  aria-label={`Фото ${i + 1}`}
-                >
-                  <Image
-                    src={src}
-                    alt={`${product.title} ${i + 1}`}
-                    fill
-                    className="object-contain"
-                    sizes="120px"
-                  />
-                </button>
-              );
-            })}
-          </div>
+          {/* ✅ Миниатюры */}
+          {showThumbs ? (
+            <div className={cn("mt-3 grid gap-2", thumbsCols)}>
+              {gallery.map((src, i) => {
+                const active = i === activeIdx;
+                return (
+                  <button
+                    key={`${src}-${i}`}
+                    type="button"
+                    onClick={() => setActiveIdx(i)}
+                    className={cn(
+                      "cursor-pointer relative aspect-square overflow-hidden rounded-2xl bg-black/[0.03] transition",
+                      active
+                        ? "ring-2 ring-black/20"
+                        : "hover:ring-2 hover:ring-black/10",
+                    )}
+                    aria-label={`Фото ${i + 1}`}
+                  >
+                    <Image
+                      src={src}
+                      alt={`${product.title} ${i + 1}`}
+                      fill
+                      className="object-contain"
+                      sizes="120px"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
         </section>
 
         {/* RIGHT */}
@@ -397,7 +434,6 @@ export default function ProductClient({
               {inCart ? "Добавлено" : "В корзину"}
             </button>
 
-            {/* ✅ FIX: one-click */}
             <button
               onClick={() => {
                 shop.setOneClick(product.id, qty);

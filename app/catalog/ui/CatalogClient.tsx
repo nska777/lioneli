@@ -12,11 +12,7 @@ import FiltersSidebar, { FiltersMeta, FiltersValue } from "./FiltersSidebar";
 import ProductActions from "../ProductActions";
 
 import {
-  BRANDS,
-  CATS,
-  MENU_ITEMS,
-  COLLECTION_ITEMS,
-  TYPE_ITEMS,
+  BRANDS, // коллекции (АМБЕР, СКАНДИ...)
   CATALOG_MOCK as MOCK,
 } from "@/app/lib/mock/catalog-products";
 
@@ -38,6 +34,65 @@ function setCSV(params: URLSearchParams, key: string, arr: string[]) {
 
 type SortKey = "default" | "title_asc" | "price_asc" | "price_desc";
 
+/**
+ * ✅ ТОП "РАЗДЕЛ" (как ты просишь)
+ * ВАЖНО: slug должен совпадать с тем, что лежит в товаре (room/menu/category).
+ * Если у тебя в моках другие значения — поменяй slug тут 1 раз, и всё заработает.
+ */
+const ROOM_ITEMS = [
+  { label: "Спальни", value: "bedrooms" },
+  { label: "Гостиные", value: "living" },
+  { label: "Прихожие", value: "hallway" },
+  { label: "Молодёжные", value: "youth" },
+  { label: "Столы и стулья", value: "tables_chairs" },
+];
+
+/**
+ * Модули (то, что хранится в моках в p.type / p.module / etc)
+ */
+const MODULE_ITEMS = [
+  { label: "Комоды", value: "komody" },
+  { label: "Тумбы", value: "tumby" },
+  { label: "Кровати", value: "krovati" },
+  { label: "Шкафы", value: "shkafy" },
+  { label: "Стеллаж", value: "stellazh" },
+  { label: "Антресоль", value: "antresol" },
+  { label: "Зеркала", value: "zerkala" },
+  { label: "Витрины", value: "vitriny" },
+  { label: "Столы", value: "stoly" },
+  { label: "Полки", value: "polki" },
+  { label: "Пуфы", value: "pufy" },
+  { label: "Вешалки", value: "veshalki" },
+  { label: "Фасады", value: "fasady" },
+  { label: "Плинтус", value: "plintus" },
+  { label: "Потолки", value: "potolki" },
+];
+
+type ProductAny = (typeof MOCK)[number] & Record<string, any>;
+
+/**
+ * ✅ Универсальные геттеры — чтобы фильтры работали даже если поля в моках названы по-разному.
+ * (Мы НЕ меняем структуру моков, просто читаем разные варианты.)
+ */
+function getRoomSlug(p: ProductAny) {
+  // что чаще всего бывает в моках:
+  return String(
+    p.menu ?? p.room ?? p.category ?? p.section ?? p.room_slug ?? "",
+  ).toLowerCase();
+}
+
+function getCollectionSlug(p: ProductAny) {
+  return String(
+    p.brand ?? p.collection ?? p.model ?? p.series ?? p.collection_slug ?? "",
+  ).toLowerCase();
+}
+
+function getModuleSlug(p: ProductAny) {
+  return String(
+    p.type ?? p.module ?? p.kind ?? p.item_type ?? p.type_slug ?? "",
+  ).toLowerCase();
+}
+
 export default function CatalogClient({
   initialBrand,
   initialCategory,
@@ -51,15 +106,32 @@ export default function CatalogClient({
 
   const { region } = useRegionLang(); // "uz" | "ru"
   const currencyLabel = region === "uz" ? "сум" : "руб.";
-  const currency: "RUB" | "UZS" = region === "ru" ? "RUB" : "UZS";
 
+  // ✅ формат цены — как у тебя было
   const fmtPrice = (rub: number, uzs: number) =>
     region === "uz"
-      ? `${uzs.toLocaleString("ru-RU")} сум`
-      : `${rub.toLocaleString("ru-RU")} руб.`;
+      ? `${uzs.toLocaleString("en-US")} сум`
+      : `${rub.toLocaleString("en-US")} руб.`;
 
-  const priceOf = (p: (typeof MOCK)[number]) =>
-    region === "uz" ? p.price_uzs : p.price_rub;
+  /**
+   * ✅ priceOf с фолбэками: поддерживаем разные названия цены в моках,
+   * чтобы не было 0..0 и "0 руб."
+   */
+  const priceOf = (p: ProductAny) => {
+    if (region === "uz") {
+      const v =
+        p.price_uzs ??
+        p.priceUZS ??
+        p.price_uz ??
+        p.priceUz ??
+        p.uzs ??
+        p.price; // крайний фолбэк
+      return Number(v ?? 0) || 0;
+    }
+    const v =
+      p.price_rub ?? p.priceRUB ?? p.price_ru ?? p.priceRu ?? p.rub ?? p.price; // крайний фолбэк
+    return Number(v ?? 0) || 0;
+  };
 
   function pushParams(mutator: (p: URLSearchParams) => void) {
     const params = new URLSearchParams(sp.toString());
@@ -68,55 +140,92 @@ export default function CatalogClient({
     router.push(qs ? `/catalog?${qs}` : "/catalog", { scroll: false });
   }
 
-  function setTopParam(key: "brand" | "category", val: string) {
+  // ✅ верхние кнопки: single-select, пишем в те же параметры
+  function setSingleCSVParam(
+    key: "menu" | "collections" | "types",
+    val: string,
+  ) {
     pushParams((params) => {
       if (!val) params.delete(key);
-      else params.set(key, val);
+      else params.set(key, val); // single
     });
   }
 
-  // --- верхние фильтры (brand/category)
-  const activeBrand = (sp.get("brand") || initialBrand || "").toLowerCase();
-  const activeCategory = (
-    sp.get("category") ||
-    initialCategory ||
-    ""
-  ).toLowerCase();
+  // ✅ BACKWARD COMPAT: если нет новых — берём старые brand/category
+  const selectedMenu = useMemo(() => {
+    const n = parseCSV(sp.get("menu"));
+    if (n.length) return n;
+    const old = (sp.get("category") || initialCategory || "").toLowerCase();
+    return old ? [old] : [];
+  }, [sp, initialCategory]);
 
-  // --- левый сайдбар (menu/collections/types/price)
-  const selectedMenu = parseCSV(sp.get("menu"));
-  const selectedCollections = parseCSV(sp.get("collections"));
-  const selectedTypes = parseCSV(sp.get("types"));
+  const selectedCollections = useMemo(() => {
+    const n = parseCSV(sp.get("collections"));
+    if (n.length) return n;
+    const old = (sp.get("brand") || initialBrand || "").toLowerCase();
+    return old ? [old] : [];
+  }, [sp, initialBrand]);
 
+  const selectedTypes = useMemo(() => parseCSV(sp.get("types")), [sp]);
+
+  /**
+   * ✅ absMin/absMax: без условных хуков.
+   * RU — считаем по реальным ценам (игнорим нули, если есть нормальные цены).
+   * UZ — фикс 0..100_000_000
+   */
   const absMin = useMemo(() => {
-    const arr = MOCK.map((p) => priceOf(p));
-    return Math.min(...arr);
+    if (region === "uz") return 0;
+
+    const prices = MOCK.map((p) => priceOf(p as any)).filter((x) =>
+      Number.isFinite(x),
+    );
+    const nonZero = prices.filter((x) => x > 0);
+    const base = nonZero.length ? nonZero : prices;
+
+    return base.length ? Math.min(...base) : 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region]);
 
   const absMax = useMemo(() => {
-    const arr = MOCK.map((p) => priceOf(p));
-    return Math.max(...arr);
+    if (region === "uz") return 100_000_000;
+
+    const prices = MOCK.map((p) => priceOf(p as any)).filter((x) =>
+      Number.isFinite(x),
+    );
+    const nonZero = prices.filter((x) => x > 0);
+    const base = nonZero.length ? nonZero : prices;
+
+    return base.length ? Math.max(...base) : 0;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region]);
 
-  const priceMin = Number(sp.get("min") || absMin);
-  const priceMax = Number(sp.get("max") || absMax);
+  // ✅ min/max из URL, но с нормальной подстраховкой
+  const priceMinRaw = Number(sp.get("min"));
+  const priceMaxRaw = Number(sp.get("max"));
+
+  const priceMin = Number.isFinite(priceMinRaw) ? priceMinRaw : absMin;
+  const priceMax = Number.isFinite(priceMaxRaw) ? priceMaxRaw : absMax;
 
   const sidebarValue: FiltersValue = {
     menu: selectedMenu,
     collections: selectedCollections,
     types: selectedTypes,
-    priceMin: isNaN(priceMin) ? absMin : priceMin,
-    priceMax: isNaN(priceMax) ? absMax : priceMax,
+    priceMin,
+    priceMax,
   };
 
+  /**
+   * ✅ Sidebar meta
+   * "Разделы" = ROOM_ITEMS (то, что сверху ты выделил)
+   * "Коллекции" = BRANDS
+   * "Модули" = MODULE_ITEMS
+   */
   const sidebarMeta: FiltersMeta = {
     priceAbsMin: absMin,
     priceAbsMax: absMax,
-    menuItems: MENU_ITEMS,
-    collectionItems: COLLECTION_ITEMS,
-    typeItems: TYPE_ITEMS,
+    menuItems: ROOM_ITEMS.map((x) => ({ label: x.label, value: x.value })),
+    collectionItems: BRANDS.map((x) => ({ label: x.title, value: x.slug })),
+    typeItems: MODULE_ITEMS,
   };
 
   function onSidebarChange(next: FiltersValue) {
@@ -124,7 +233,6 @@ export default function CatalogClient({
       setCSV(params, "menu", next.menu);
       setCSV(params, "collections", next.collections);
       setCSV(params, "types", next.types);
-
       params.set("min", String(next.priceMin));
       params.set("max", String(next.priceMax));
     });
@@ -159,57 +267,69 @@ export default function CatalogClient({
     });
   }
 
-  // --- filter
+  // --- FILTER
   const filtered = useMemo(() => {
     const needle = qFromUrl.toLowerCase();
 
-    return MOCK.filter((p) => {
-      if (activeBrand && p.brand !== activeBrand) return false;
-      if (activeCategory && p.category !== activeCategory) return false;
+    return MOCK.filter((pAny) => {
+      const p = pAny as ProductAny;
 
-      if (selectedMenu.length && !selectedMenu.includes(p.menu)) return false;
+      // ✅ Разделы (top/left) = room/category/menu
+      const room = getRoomSlug(p);
+      if (sidebarValue.menu.length && !sidebarValue.menu.includes(room))
+        return false;
+
+      // ✅ Коллекции = brand/collection/model
+      const col = getCollectionSlug(p);
       if (
-        selectedCollections.length &&
-        !selectedCollections.includes(p.collection)
+        sidebarValue.collections.length &&
+        !sidebarValue.collections.includes(col)
       )
         return false;
-      if (selectedTypes.length && !selectedTypes.includes(p.type)) return false;
 
+      // ✅ Модули = type/module/kind
+      const mod = getModuleSlug(p);
+      if (sidebarValue.types.length && !sidebarValue.types.includes(mod))
+        return false;
+
+      // ✅ Price filter
       const price = priceOf(p);
       if (price < sidebarValue.priceMin) return false;
       if (price > sidebarValue.priceMax) return false;
 
+      // ✅ Search (title + badge)
       if (needle) {
-        const hay = `${p.title} ${p.badge ?? ""}`.toLowerCase();
+        const hay = `${p.title ?? ""} ${p.badge ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
 
       return true;
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    activeBrand,
-    activeCategory,
-    selectedMenu.join(","),
-    selectedCollections.join(","),
-    selectedTypes.join(","),
     qFromUrl,
     region,
+    sidebarValue.menu.join(","),
+    sidebarValue.collections.join(","),
+    sidebarValue.types.join(","),
     sidebarValue.priceMin,
     sidebarValue.priceMax,
   ]);
 
-  // --- sort
+  // --- SORT
   const sorted = useMemo(() => {
     const arr = [...filtered];
     switch (sort) {
       case "title_asc":
-        arr.sort((a, b) => a.title.localeCompare(b.title, "ru"));
+        arr.sort((a, b) =>
+          String(a.title).localeCompare(String(b.title), "ru"),
+        );
         break;
       case "price_asc":
-        arr.sort((a, b) => priceOf(a) - priceOf(b));
+        arr.sort((a, b) => priceOf(a as any) - priceOf(b as any));
         break;
       case "price_desc":
-        arr.sort((a, b) => priceOf(b) - priceOf(a));
+        arr.sort((a, b) => priceOf(b as any) - priceOf(a as any));
         break;
       default:
         break;
@@ -236,17 +356,20 @@ export default function CatalogClient({
       },
     );
   }, [
-    activeBrand,
-    activeCategory,
-    selectedMenu.join(","),
-    selectedCollections.join(","),
-    selectedTypes.join(","),
+    sidebarValue.menu.join(","),
+    sidebarValue.collections.join(","),
+    sidebarValue.types.join(","),
     sidebarValue.priceMin,
     sidebarValue.priceMax,
     region,
     qFromUrl,
     sort,
   ]);
+
+  // ✅ активные значения для верхних кнопок (single)
+  const activeRoom = sidebarValue.menu[0] || "";
+  const activeCollection = sidebarValue.collections[0] || "";
+  const activeModule = sidebarValue.types[0] || "";
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-10">
@@ -271,7 +394,7 @@ export default function CatalogClient({
 
       {/* Layout */}
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-        {/* Sidebar filters */}
+        {/* Sidebar */}
         <FiltersSidebar
           value={sidebarValue}
           meta={sidebarMeta}
@@ -292,17 +415,45 @@ export default function CatalogClient({
         <section>
           {/* Верхние фильтры */}
           <div className="mb-4 rounded-2xl border border-black/10 bg-[#F7F5F2] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
+            {/* Раздел */}
             <div className="text-[12px] tracking-[0.18em] uppercase text-black/45">
-              Бренды
+              Раздел
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {ROOM_ITEMS.map((c) => {
+                const active = activeRoom === c.value;
+                return (
+                  <button
+                    key={c.value}
+                    onClick={() =>
+                      setSingleCSVParam("menu", active ? "" : c.value)
+                    }
+                    className={cn(
+                      "cursor-pointer rounded-full border px-3 py-1.5 text-[12px] transition",
+                      active
+                        ? "border-black bg-black text-white"
+                        : "border-black/10 bg-white text-black/70 hover:text-black",
+                    )}
+                  >
+                    {c.label}
+                  </button>
+                );
+              })}
             </div>
 
+            {/* Коллекции */}
+            <div className="mt-6 text-[12px] tracking-[0.18em] uppercase text-black/45">
+              Коллекции
+            </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {BRANDS.map((b) => {
-                const active = activeBrand === b.slug;
+                const active = activeCollection === b.slug;
                 return (
                   <button
                     key={b.slug}
-                    onClick={() => setTopParam("brand", active ? "" : b.slug)}
+                    onClick={() =>
+                      setSingleCSVParam("collections", active ? "" : b.slug)
+                    }
                     className={cn(
                       "cursor-pointer rounded-full border px-3 py-1.5 text-[12px] transition",
                       active
@@ -316,18 +467,18 @@ export default function CatalogClient({
               })}
             </div>
 
+            {/* Модули */}
             <div className="mt-6 text-[12px] tracking-[0.18em] uppercase text-black/45">
-              Категории бренда
+              Модули
             </div>
-
             <div className="mt-3 flex flex-wrap gap-2">
-              {CATS.map((c) => {
-                const active = activeCategory === c.slug;
+              {MODULE_ITEMS.map((m) => {
+                const active = activeModule === m.value;
                 return (
                   <button
-                    key={c.slug}
+                    key={m.value}
                     onClick={() =>
-                      setTopParam("category", active ? "" : c.slug)
+                      setSingleCSVParam("types", active ? "" : m.value)
                     }
                     className={cn(
                       "cursor-pointer rounded-full border px-3 py-1.5 text-[12px] transition",
@@ -336,17 +487,20 @@ export default function CatalogClient({
                         : "border-black/10 bg-white text-black/70 hover:text-black",
                     )}
                   >
-                    {c.title}
+                    {m.label}
                   </button>
                 );
               })}
             </div>
+
+            {/* ✅ Куда добавлять ещё 5 коллекций позже:
+                app/lib/mock/catalog-products.ts -> массив BRANDS (добавляй { title, slug })
+            */}
           </div>
 
-          {/* Toolbar: search + sort */}
+          {/* Toolbar */}
           <div className="mb-4 rounded-2xl border border-black/10 bg-[#F7F5F2] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
             <div className="grid gap-3 md:grid-cols-[1fr_260px]">
-              {/* Search */}
               <div className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 backdrop-blur">
                 <div className="text-[10px] tracking-[0.16em] uppercase text-black/45">
                   Поиск
@@ -363,7 +517,6 @@ export default function CatalogClient({
                 />
               </div>
 
-              {/* Sort */}
               <div className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 backdrop-blur">
                 <div className="text-[10px] tracking-[0.16em] uppercase text-black/45">
                   Сортировка
@@ -380,29 +533,6 @@ export default function CatalogClient({
                 </select>
               </div>
             </div>
-
-            {(qFromUrl || sort !== "default") && (
-              <div className="mt-3 text-[12px] text-black/55">
-                {qFromUrl ? (
-                  <span>
-                    Поиск: <span className="text-black/80">{qFromUrl}</span>
-                  </span>
-                ) : null}
-                {qFromUrl && sort !== "default" ? <span> • </span> : null}
-                {sort !== "default" ? (
-                  <span>
-                    Сортировка:{" "}
-                    <span className="text-black/80">
-                      {sort === "title_asc"
-                        ? "A→Я"
-                        : sort === "price_asc"
-                          ? "цена ↑"
-                          : "цена ↓"}
-                    </span>
-                  </span>
-                ) : null}
-              </div>
-            )}
           </div>
 
           {/* Cards */}
@@ -410,17 +540,17 @@ export default function CatalogClient({
             ref={gridRef}
             className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
           >
-            {sorted.map((p, idx) => {
+            {sorted.map((pAny, idx) => {
+              const p = pAny as ProductAny;
               const href = `/product/${p.id}`;
 
-              // ✅ snapshot для Supabase wishlist
               const snapshot = {
                 title: p.title,
                 href,
                 imageUrl: p.image,
-                sku: (p as any).sku ? String((p as any).sku) : null,
-                price_uzs: Number((p as any).price_uzs ?? 0),
-                price_rub: Number((p as any).price_rub ?? 0),
+                sku: p.sku ? String(p.sku) : null,
+                price_uzs: Number(p.price_uzs ?? p.priceUZS ?? p.price ?? 0),
+                price_rub: Number(p.price_rub ?? p.priceRUB ?? p.price ?? 0),
               };
 
               return (
@@ -448,7 +578,6 @@ export default function CatalogClient({
                         </div>
                       ) : null}
 
-                      {/* ✅ actions: НЕ ломаем клик по карточке */}
                       <div className="absolute right-3 top-3 z-10 flex translate-y-[-6px] gap-2 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
                         <div
                           onClick={(e) => {
@@ -460,7 +589,6 @@ export default function CatalogClient({
                             id={String(p.id)}
                             snapshot={snapshot}
                             onOpenSpecs={() => {
-                              // в каталоге можно просто открыть карточку
                               window.location.href = href;
                             }}
                           />
@@ -474,10 +602,12 @@ export default function CatalogClient({
                       </div>
 
                       <div className="mt-2 text-[15px] font-semibold text-black">
-                        {fmtPrice(p.price_rub, p.price_uzs)}
+                        {fmtPrice(
+                          Number(p.price_rub ?? p.priceRUB ?? p.price ?? 0),
+                          Number(p.price_uzs ?? p.priceUZS ?? p.price ?? 0),
+                        )}
                       </div>
 
-                      {/* CTA ведёт на товар (премиальнее, без дублирования toggleCart) */}
                       <div
                         className={cn(
                           "mt-4 w-full rounded-xl px-4 py-2.5 text-center",
@@ -500,11 +630,6 @@ export default function CatalogClient({
               фильтров.
             </div>
           ) : null}
-
-          <p className="mt-6 text-xs text-black/45">
-            Валюта: <span className="text-black/70">{currency}</span> • цены
-            пересчитываются по региону
-          </p>
         </section>
       </div>
     </main>

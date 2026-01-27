@@ -7,6 +7,7 @@ import CallButton from "./CallButton";
 import { useLayoutEffect, useRef } from "react";
 import gsap from "gsap";
 import { usePathname } from "next/navigation";
+import { tF } from "@/i18n";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -83,12 +84,11 @@ function TopLink({
     <span
       ref={lineRef}
       aria-hidden
-      className="pointer-events-none absolute left-0 -bottom-[0.75px] w-full rounded-full h-[0.75px]"
+      className="pointer-events-none absolute left-0 -bottom-[0.75px] h-[0.75px] w-full rounded-full"
       style={{ background: "rgba(0,0,0,0.65)" }}
     />
   );
 
-  // external
   if (external) {
     return (
       <a
@@ -113,18 +113,34 @@ function TopLink({
 }
 
 export default function TopBar({
+  dict,
   topLinks,
   phone,
   regionTitle,
+  regionTitleKey,
+  regionTitleFallback,
   addresses,
   callCtaLabel = "Заказать звонок",
   onPickAddress,
   onOpenCall,
   onOpenMobileMenu,
 }: {
-  topLinks: readonly { label: string; href: string; isExternal?: boolean }[];
+  dict: any;
+  topLinks: readonly {
+    labelKey?: string;
+    fallback: string;
+    href: string;
+    isExternal?: boolean;
+  }[];
   phone: string;
-  regionTitle: string;
+
+  // legacy
+  regionTitle?: string;
+
+  // ✅ новый формат (как у тебя в Header.tsx)
+  regionTitleKey?: string;
+  regionTitleFallback?: string;
+
   addresses: string[];
   callCtaLabel?: string;
   onPickAddress: (address: string) => void;
@@ -132,6 +148,16 @@ export default function TopBar({
   onOpenMobileMenu: () => void;
 }) {
   const pathname = usePathname();
+
+  const resolvedRegionTitle =
+    regionTitle ??
+    tF(
+      dict,
+      String(regionTitleKey ?? "region.uz"),
+      String(regionTitleFallback ?? "Узбекистан"),
+    ).toUpperCase();
+
+  const storesLabel = tF(dict, "header.stores", "Адреса магазинов");
 
   return (
     <div className="border-b border-black/10">
@@ -146,7 +172,8 @@ export default function TopBar({
                 active={!l.isExternal && isActive(pathname, l.href)}
                 external={l.isExternal}
               >
-                {l.label}
+                {/* ✅ если есть labelKey — переводим */}
+                {l.labelKey ? tF(dict, l.labelKey, l.fallback) : l.fallback}
               </TopLink>
             ))}
           </nav>
@@ -154,7 +181,7 @@ export default function TopBar({
           {/* mobile burger */}
           <div className="flex items-center gap-2 md:hidden">
             <button
-              className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full hover:bg-black/5 transition"
+              className="inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-full transition hover:bg-black/5"
               onClick={onOpenMobileMenu}
               aria-label="Menu"
               type="button"
@@ -166,7 +193,8 @@ export default function TopBar({
           {/* right */}
           <div className="flex items-center gap-4 md:gap-8">
             <StoresDropdown
-              regionTitle={regionTitle}
+              label={storesLabel} // ✅ переведённый UI-текст
+              regionTitle={resolvedRegionTitle} // ✅ тоже корректно
               addresses={addresses}
               onPickAddress={onPickAddress}
             />
@@ -175,7 +203,7 @@ export default function TopBar({
               <Phone className="h-4 w-4 opacity-70" />
               <a
                 href={`tel:${phone.replace(/\s|\(|\)|-/g, "")}`}
-                className="cursor-pointer hover:text-black transition"
+                className="cursor-pointer transition hover:text-black"
               >
                 {phone}
               </a>
