@@ -5,16 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import gsap from "gsap";
+import { X } from "lucide-react";
 
 import { useRegionLang } from "@/app/context/region-lang";
 
 import FiltersSidebar, { FiltersMeta, FiltersValue } from "./FiltersSidebar";
 import ProductActions from "../ProductActions";
 
-import {
-  BRANDS, // коллекции (AMBER, SCANDI...)
-  CATALOG_MOCK as MOCK,
-} from "@/app/lib/mock/catalog-products";
+import { BRANDS, CATALOG_MOCK as MOCK } from "@/app/lib/mock/catalog-products";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -38,6 +36,10 @@ type SortKey = "default" | "title_asc" | "price_asc" | "price_desc";
  * ✅ ТОП "РАЗДЕЛ" (как ты просишь)
  * ВАЖНО: value должен совпадать с тем, что реально лежит в товаре
  * (menu / room / category / section ...)
+ *
+ * Сейчас в твоих моках (catalog-products.ts) есть brand + cat.
+ * Поэтому эти кнопки будут работать ТОЛЬКО если у товара реально есть поле room/menu.
+ * (Я оставил универсальный getter — если поля нет, фильтр не будет отсеивать.)
  */
 const ROOM_ITEMS = [
   { label: "Спальни", value: "bedrooms" },
@@ -48,51 +50,48 @@ const ROOM_ITEMS = [
 ];
 
 /**
- * ✅ Модули (то, что хранится в моках в p.type / p.module / etc)
+ * ✅ Модули
+ * Для твоих моков логично считать, что module = cat (komody/krovati/...)
+ * Но я оставил фолбэки, чтобы не ломать другие товары.
  */
 const MODULE_ITEMS = [
   { label: "Комоды", value: "komody" },
   { label: "Тумбы", value: "tumby" },
   { label: "Кровати", value: "krovati" },
   { label: "Шкафы", value: "shkafy" },
-  { label: "Стеллаж", value: "stellazh" },
+  { label: "Стеллаж", value: "stellaji" },
   { label: "Антресоль", value: "antresol" },
   { label: "Зеркала", value: "zerkala" },
-  { label: "Витрины", value: "vitriny" },
-  { label: "Столы", value: "stoly" },
+  { label: "Витрины", value: "vitrini" },
+  { label: "Столы", value: "stoli" },
   { label: "Полки", value: "polki" },
   { label: "Пуфы", value: "pufy" },
   { label: "Вешалки", value: "veshalki" },
-  { label: "Фасады", value: "fasady" },
+  { label: "Фасады", value: "fasadi" },
   { label: "Плинтус", value: "plintus" },
   { label: "Потолки", value: "potolki" },
 ];
 
 type ProductAny = (typeof MOCK)[number] & Record<string, any>;
 
-/**
- * ✅ Универсальные геттеры — чтобы фильтры работали даже если поля в моках названы по-разному.
- */
 function getRoomSlug(p: ProductAny) {
+  // если room/menu нет — возвращаем пусто, и фильтр "Раздел" не будет вырезать товары
   return String(
-    p.menu ?? p.room ?? p.category ?? p.section ?? p.room_slug ?? "",
+    p.menu ?? p.room ?? p.section ?? p.category ?? p.room_slug ?? "",
   )
     .trim()
     .toLowerCase();
 }
 
 function getCollectionSlug(p: ProductAny) {
-  return String(
-    p.brand ?? p.collection ?? p.model ?? p.series ?? p.collection_slug ?? "",
-  )
+  return String(p.brand ?? p.collection ?? p.model ?? p.series ?? "")
     .trim()
     .toLowerCase();
 }
 
 function getModuleSlug(p: ProductAny) {
-  return String(
-    p.type ?? p.module ?? p.kind ?? p.item_type ?? p.type_slug ?? "",
-  )
+  // ✅ если нет type/module — берём cat (твой текущий мок)
+  return String(p.type ?? p.module ?? p.kind ?? p.cat ?? p.item_type ?? "")
     .trim()
     .toLowerCase();
 }
@@ -111,36 +110,18 @@ export default function CatalogClient({
   const { region } = useRegionLang(); // "uz" | "ru"
   const currencyLabel = region === "uz" ? "сум" : "руб.";
 
-  // ✅ формат цены — как у тебя было
   const fmtPrice = (rub: number, uzs: number) =>
     region === "uz"
       ? `${uzs.toLocaleString("en-US")} сум`
       : `${rub.toLocaleString("en-US")} руб.`;
 
-  /**
-   * ✅ priceOf с фолбэками: поддерживаем разные названия цены в моках,
-   * чтобы не было 0..0 и "0 руб."
-   */
+  // ✅ единый геттер цены + фолбэки (priceUZS/priceRUB и snake_case тоже)
   const priceOf = (p: ProductAny) => {
     if (region === "uz") {
-      const v =
-        p.price_uzs ??
-        p.priceUZS ??
-        p.priceUZs ??
-        p.price_uz ??
-        p.priceUz ??
-        p.uzs ??
-        p.price; // крайний фолбэк
+      const v = p.price_uzs ?? p.priceUZS ?? p.priceUz ?? p.uzs ?? 0;
       return Number(v ?? 0) || 0;
     }
-    const v =
-      p.price_rub ??
-      p.priceRUB ??
-      p.priceRub ??
-      p.price_ru ??
-      p.priceRu ??
-      p.rub ??
-      p.price; // крайний фолбэк
+    const v = p.price_rub ?? p.priceRUB ?? p.priceRub ?? p.rub ?? 0;
     return Number(v ?? 0) || 0;
   };
 
@@ -151,22 +132,21 @@ export default function CatalogClient({
     router.push(qs ? `/catalog?${qs}` : "/catalog", { scroll: false });
   }
 
-  // ✅ верхние кнопки: single-select
   function setSingleCSVParam(
     key: "menu" | "collections" | "types",
     val: string,
   ) {
     pushParams((params) => {
       if (!val) params.delete(key);
-      else params.set(key, val); // single
+      else params.set(key, val);
     });
   }
 
-  // ✅ BACKWARD COMPAT: если нет новых — берём старые brand/category
   const selectedMenu = useMemo(() => {
     const n = parseCSV(sp.get("menu"));
     if (n.length) return n;
 
+    // backward compat
     const old = (sp.get("category") || initialCategory || "").toLowerCase();
     return old ? [old] : [];
   }, [sp, initialCategory]);
@@ -175,17 +155,14 @@ export default function CatalogClient({
     const n = parseCSV(sp.get("collections"));
     if (n.length) return n;
 
+    // backward compat
     const old = (sp.get("brand") || initialBrand || "").toLowerCase();
     return old ? [old] : [];
   }, [sp, initialBrand]);
 
   const selectedTypes = useMemo(() => parseCSV(sp.get("types")), [sp]);
 
-  /**
-   * ✅ absMin/absMax: без условных хуков (hook-order safe)
-   * RU — считаем по реальным ценам (игнорим нули, если есть нормальные цены)
-   * UZ — фикс 0..100_000_000
-   */
+  // ✅ absMin/absMax: hook-order safe
   const absMin = useMemo(() => {
     if (region === "uz") return 0;
 
@@ -214,12 +191,7 @@ export default function CatalogClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region]);
 
-  /**
-   * ✅ min/max из URL, но с защитой:
-   * - если params нет => берём absMin/absMax (видно все товары)
-   * - если в URL max=0 или мусор => поднимаем до absMax
-   * - если min/max перепутались => нормализуем
-   */
+  // ✅ ключевой фикс: если max нет / max=0 → показываем ВСЕ товары
   const rawMin = sp.get("min");
   const rawMax = sp.get("max");
 
@@ -237,7 +209,6 @@ export default function CatalogClient({
         ? Number(rawMax)
         : absMax;
 
-  // ✅ ключевой фикс: если max почему-то 0 или меньше min — показываем все
   if (maxFromUrl <= 0) maxFromUrl = absMax;
 
   const safeMin = Math.min(minFromUrl, maxFromUrl);
@@ -278,19 +249,30 @@ export default function CatalogClient({
   const qFromUrl = (sp.get("q") || "").trim();
   const sort = ((sp.get("sort") || "default") as SortKey) || "default";
 
+  // ✅ input-state
   const [q, setQ] = useState(qFromUrl);
 
+  // ✅ если URL поменялся (назад/вперёд) — синхронизируем инпут
   useEffect(() => {
     setQ(qFromUrl);
   }, [qFromUrl]);
 
-  function applySearch(nextQ: string) {
-    const clean = nextQ.trim();
-    pushParams((params) => {
-      if (!clean) params.delete("q");
-      else params.set("q", clean);
-    });
-  }
+  // ✅ LIVE SEARCH: пишешь → через 250мс обновляет URL
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const clean = q.trim();
+      // если в URL уже то же самое — не пушим лишний раз
+      if (clean === qFromUrl) return;
+
+      pushParams((params) => {
+        if (!clean) params.delete("q");
+        else params.set("q", clean);
+      });
+    }, 250);
+
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
 
   function setSort(next: SortKey) {
     pushParams((params) => {
@@ -306,10 +288,13 @@ export default function CatalogClient({
     return MOCK.filter((pAny) => {
       const p = pAny as ProductAny;
 
-      // ✅ Разделы
+      // ✅ Разделы (работает только если у товара реально есть room/menu)
       const room = getRoomSlug(p);
-      if (sidebarValue.menu.length && !sidebarValue.menu.includes(room))
-        return false;
+      if (sidebarValue.menu.length) {
+        if (!room) {
+          // у товара нет room → не вырезаем (иначе ты потеряешь товары)
+        } else if (!sidebarValue.menu.includes(room)) return false;
+      }
 
       // ✅ Коллекции
       const col = getCollectionSlug(p);
@@ -319,7 +304,7 @@ export default function CatalogClient({
       )
         return false;
 
-      // ✅ Модули
+      // ✅ Модули (у тебя = cat)
       const mod = getModuleSlug(p);
       if (sidebarValue.types.length && !sidebarValue.types.includes(mod))
         return false;
@@ -369,7 +354,7 @@ export default function CatalogClient({
     return arr;
   }, [filtered, sort, region]);
 
-  // ✅ Apple-style reveal
+  // ✅ reveal
   useEffect(() => {
     if (!gridRef.current) return;
     const cards = gridRef.current.querySelectorAll("[data-card]");
@@ -398,14 +383,12 @@ export default function CatalogClient({
     sort,
   ]);
 
-  // ✅ активные значения для верхних кнопок (single)
   const activeRoom = sidebarValue.menu[0] || "";
   const activeCollection = sidebarValue.collections[0] || "";
   const activeModule = sidebarValue.types[0] || "";
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-10">
-      {/* Header */}
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[24px] font-medium tracking-[-0.02em]">
@@ -424,9 +407,7 @@ export default function CatalogClient({
         </button>
       </div>
 
-      {/* Layout */}
       <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
-        {/* Sidebar */}
         <FiltersSidebar
           value={sidebarValue}
           meta={sidebarMeta}
@@ -443,11 +424,9 @@ export default function CatalogClient({
           currencyLabel={currencyLabel}
         />
 
-        {/* Grid */}
         <section>
           {/* Верхние фильтры */}
           <div className="mb-4 rounded-2xl border border-black/10 bg-[#F7F5F2] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-            {/* Раздел */}
             <div className="text-[12px] tracking-[0.18em] uppercase text-black/45">
               Раздел
             </div>
@@ -473,7 +452,6 @@ export default function CatalogClient({
               })}
             </div>
 
-            {/* Коллекции */}
             <div className="mt-6 text-[12px] tracking-[0.18em] uppercase text-black/45">
               Коллекции
             </div>
@@ -499,7 +477,6 @@ export default function CatalogClient({
               })}
             </div>
 
-            {/* Модули */}
             <div className="mt-6 text-[12px] tracking-[0.18em] uppercase text-black/45">
               Модули
             </div>
@@ -533,22 +510,33 @@ export default function CatalogClient({
           {/* Toolbar */}
           <div className="mb-4 rounded-2xl border border-black/10 bg-[#F7F5F2] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
             <div className="grid gap-3 md:grid-cols-[1fr_260px]">
-              <div className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 backdrop-blur">
+              {/* Search */}
+              <div className="relative rounded-2xl border border-black/10 bg-white/80 px-4 py-3 backdrop-blur">
                 <div className="text-[10px] tracking-[0.16em] uppercase text-black/45">
                   Поиск
                 </div>
+
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") applySearch(q);
-                  }}
-                  onBlur={() => applySearch(q)}
                   placeholder="Витрина, тумба, шкаф…"
-                  className="mt-1 w-full bg-transparent text-[14px] text-black/85 outline-none placeholder:text-black/35"
+                  className="mt-1 w-full bg-transparent pr-10 text-[14px] text-black/85 outline-none placeholder:text-black/35"
                 />
+
+                {!!q.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setQ("")}
+                    className="absolute right-3 top-[30px] grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-white text-black/60 hover:text-black hover:border-black/20 transition cursor-pointer"
+                    aria-label="Очистить поиск"
+                    title="Очистить"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
+              {/* Sort */}
               <div className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 backdrop-blur">
                 <div className="text-[10px] tracking-[0.16em] uppercase text-black/45">
                   Сортировка
@@ -581,8 +569,8 @@ export default function CatalogClient({
                 href,
                 imageUrl: p.image,
                 sku: p.sku ? String(p.sku) : null,
-                price_uzs: Number(p.price_uzs ?? p.priceUZS ?? p.price ?? 0),
-                price_rub: Number(p.price_rub ?? p.priceRUB ?? p.price ?? 0),
+                price_uzs: Number(p.price_uzs ?? p.priceUZS ?? 0),
+                price_rub: Number(p.price_rub ?? p.priceRUB ?? 0),
               };
 
               return (
@@ -601,7 +589,6 @@ export default function CatalogClient({
                         className="object-cover transition-transform duration-700 group-hover:scale-[1.05]"
                         priority={idx < 6}
                       />
-
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-black/0 to-black/0" />
 
                       {p.badge ? (
@@ -635,8 +622,8 @@ export default function CatalogClient({
 
                       <div className="mt-2 text-[15px] font-semibold text-black">
                         {fmtPrice(
-                          Number(p.price_rub ?? p.priceRUB ?? p.price ?? 0),
-                          Number(p.price_uzs ?? p.priceUZS ?? p.price ?? 0),
+                          Number(p.price_rub ?? p.priceRUB ?? 0),
+                          Number(p.price_uzs ?? p.priceUZS ?? 0),
                         )}
                       </div>
 
