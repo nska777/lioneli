@@ -12,7 +12,7 @@ import FiltersSidebar, { FiltersMeta, FiltersValue } from "./FiltersSidebar";
 import ProductActions from "../ProductActions";
 
 import {
-  BRANDS, // коллекции (АМБЕР, СКАНДИ...)
+  BRANDS, // коллекции (AMBER, SCANDI...)
   CATALOG_MOCK as MOCK,
 } from "@/app/lib/mock/catalog-products";
 
@@ -36,8 +36,8 @@ type SortKey = "default" | "title_asc" | "price_asc" | "price_desc";
 
 /**
  * ✅ ТОП "РАЗДЕЛ" (как ты просишь)
- * ВАЖНО: slug должен совпадать с тем, что лежит в товаре (room/menu/category).
- * Если у тебя в моках другие значения — поменяй slug тут 1 раз, и всё заработает.
+ * ВАЖНО: value должен совпадать с тем, что реально лежит в товаре
+ * (menu / room / category / section ...)
  */
 const ROOM_ITEMS = [
   { label: "Спальни", value: "bedrooms" },
@@ -48,7 +48,7 @@ const ROOM_ITEMS = [
 ];
 
 /**
- * Модули (то, что хранится в моках в p.type / p.module / etc)
+ * ✅ Модули (то, что хранится в моках в p.type / p.module / etc)
  */
 const MODULE_ITEMS = [
   { label: "Комоды", value: "komody" },
@@ -72,25 +72,29 @@ type ProductAny = (typeof MOCK)[number] & Record<string, any>;
 
 /**
  * ✅ Универсальные геттеры — чтобы фильтры работали даже если поля в моках названы по-разному.
- * (Мы НЕ меняем структуру моков, просто читаем разные варианты.)
  */
 function getRoomSlug(p: ProductAny) {
-  // что чаще всего бывает в моках:
   return String(
     p.menu ?? p.room ?? p.category ?? p.section ?? p.room_slug ?? "",
-  ).toLowerCase();
+  )
+    .trim()
+    .toLowerCase();
 }
 
 function getCollectionSlug(p: ProductAny) {
   return String(
     p.brand ?? p.collection ?? p.model ?? p.series ?? p.collection_slug ?? "",
-  ).toLowerCase();
+  )
+    .trim()
+    .toLowerCase();
 }
 
 function getModuleSlug(p: ProductAny) {
   return String(
     p.type ?? p.module ?? p.kind ?? p.item_type ?? p.type_slug ?? "",
-  ).toLowerCase();
+  )
+    .trim()
+    .toLowerCase();
 }
 
 export default function CatalogClient({
@@ -122,6 +126,7 @@ export default function CatalogClient({
       const v =
         p.price_uzs ??
         p.priceUZS ??
+        p.priceUZs ??
         p.price_uz ??
         p.priceUz ??
         p.uzs ??
@@ -129,7 +134,13 @@ export default function CatalogClient({
       return Number(v ?? 0) || 0;
     }
     const v =
-      p.price_rub ?? p.priceRUB ?? p.price_ru ?? p.priceRu ?? p.rub ?? p.price; // крайний фолбэк
+      p.price_rub ??
+      p.priceRUB ??
+      p.priceRub ??
+      p.price_ru ??
+      p.priceRu ??
+      p.rub ??
+      p.price; // крайний фолбэк
     return Number(v ?? 0) || 0;
   };
 
@@ -140,7 +151,7 @@ export default function CatalogClient({
     router.push(qs ? `/catalog?${qs}` : "/catalog", { scroll: false });
   }
 
-  // ✅ верхние кнопки: single-select, пишем в те же параметры
+  // ✅ верхние кнопки: single-select
   function setSingleCSVParam(
     key: "menu" | "collections" | "types",
     val: string,
@@ -155,6 +166,7 @@ export default function CatalogClient({
   const selectedMenu = useMemo(() => {
     const n = parseCSV(sp.get("menu"));
     if (n.length) return n;
+
     const old = (sp.get("category") || initialCategory || "").toLowerCase();
     return old ? [old] : [];
   }, [sp, initialCategory]);
@@ -162,6 +174,7 @@ export default function CatalogClient({
   const selectedCollections = useMemo(() => {
     const n = parseCSV(sp.get("collections"));
     if (n.length) return n;
+
     const old = (sp.get("brand") || initialBrand || "").toLowerCase();
     return old ? [old] : [];
   }, [sp, initialBrand]);
@@ -169,8 +182,8 @@ export default function CatalogClient({
   const selectedTypes = useMemo(() => parseCSV(sp.get("types")), [sp]);
 
   /**
-   * ✅ absMin/absMax: без условных хуков.
-   * RU — считаем по реальным ценам (игнорим нули, если есть нормальные цены).
+   * ✅ absMin/absMax: без условных хуков (hook-order safe)
+   * RU — считаем по реальным ценам (игнорим нули, если есть нормальные цены)
    * UZ — фикс 0..100_000_000
    */
   const absMin = useMemo(() => {
@@ -179,6 +192,7 @@ export default function CatalogClient({
     const prices = MOCK.map((p) => priceOf(p as any)).filter((x) =>
       Number.isFinite(x),
     );
+
     const nonZero = prices.filter((x) => x > 0);
     const base = nonZero.length ? nonZero : prices;
 
@@ -192,6 +206,7 @@ export default function CatalogClient({
     const prices = MOCK.map((p) => priceOf(p as any)).filter((x) =>
       Number.isFinite(x),
     );
+
     const nonZero = prices.filter((x) => x > 0);
     const base = nonZero.length ? nonZero : prices;
 
@@ -199,27 +214,43 @@ export default function CatalogClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region]);
 
-  // ✅ min/max из URL, но с нормальной подстраховкой
-  const priceMinRaw = Number(sp.get("min"));
-  const priceMaxRaw = Number(sp.get("max"));
+  /**
+   * ✅ min/max из URL, но с защитой:
+   * - если params нет => берём absMin/absMax (видно все товары)
+   * - если в URL max=0 или мусор => поднимаем до absMax
+   * - если min/max перепутались => нормализуем
+   */
+  const rawMin = sp.get("min");
+  const rawMax = sp.get("max");
 
-  const priceMin = Number.isFinite(priceMinRaw) ? priceMinRaw : absMin;
-  const priceMax = Number.isFinite(priceMaxRaw) ? priceMaxRaw : absMax;
+  const minFromUrl =
+    rawMin === null
+      ? absMin
+      : Number.isFinite(Number(rawMin))
+        ? Number(rawMin)
+        : absMin;
+
+  let maxFromUrl =
+    rawMax === null
+      ? absMax
+      : Number.isFinite(Number(rawMax))
+        ? Number(rawMax)
+        : absMax;
+
+  // ✅ ключевой фикс: если max почему-то 0 или меньше min — показываем все
+  if (maxFromUrl <= 0) maxFromUrl = absMax;
+
+  const safeMin = Math.min(minFromUrl, maxFromUrl);
+  const safeMax = Math.max(minFromUrl, maxFromUrl);
 
   const sidebarValue: FiltersValue = {
     menu: selectedMenu,
     collections: selectedCollections,
     types: selectedTypes,
-    priceMin,
-    priceMax,
+    priceMin: safeMin,
+    priceMax: safeMax,
   };
 
-  /**
-   * ✅ Sidebar meta
-   * "Разделы" = ROOM_ITEMS (то, что сверху ты выделил)
-   * "Коллекции" = BRANDS
-   * "Модули" = MODULE_ITEMS
-   */
   const sidebarMeta: FiltersMeta = {
     priceAbsMin: absMin,
     priceAbsMax: absMax,
@@ -233,6 +264,7 @@ export default function CatalogClient({
       setCSV(params, "menu", next.menu);
       setCSV(params, "collections", next.collections);
       setCSV(params, "types", next.types);
+
       params.set("min", String(next.priceMin));
       params.set("max", String(next.priceMax));
     });
@@ -274,12 +306,12 @@ export default function CatalogClient({
     return MOCK.filter((pAny) => {
       const p = pAny as ProductAny;
 
-      // ✅ Разделы (top/left) = room/category/menu
+      // ✅ Разделы
       const room = getRoomSlug(p);
       if (sidebarValue.menu.length && !sidebarValue.menu.includes(room))
         return false;
 
-      // ✅ Коллекции = brand/collection/model
+      // ✅ Коллекции
       const col = getCollectionSlug(p);
       if (
         sidebarValue.collections.length &&
@@ -287,17 +319,17 @@ export default function CatalogClient({
       )
         return false;
 
-      // ✅ Модули = type/module/kind
+      // ✅ Модули
       const mod = getModuleSlug(p);
       if (sidebarValue.types.length && !sidebarValue.types.includes(mod))
         return false;
 
-      // ✅ Price filter
+      // ✅ Price
       const price = priceOf(p);
       if (price < sidebarValue.priceMin) return false;
       if (price > sidebarValue.priceMax) return false;
 
-      // ✅ Search (title + badge)
+      // ✅ Search
       if (needle) {
         const hay = `${p.title ?? ""} ${p.badge ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
