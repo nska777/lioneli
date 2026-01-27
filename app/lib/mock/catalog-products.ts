@@ -1,6 +1,6 @@
 // app/lib/mock/catalog-products.ts
 // ✅ Единый источник правды для каталога (моки)
-// ✅ Совместимость со старым UI: CATALOG_BY_ID.get + price_rub/price_uzs
+// ✅ Экспортируем BRANDS / CATS / CATALOG_MOCK / CATALOG_BY_ID
 
 export type BrandItem = { title: string; slug: string };
 export type CatItem = { title: string; slug: string };
@@ -19,18 +19,16 @@ export type CatalogProduct = {
   href?: string;
 
   // картинки
-  image: string; // основная
-  gallery?: string[]; // слайдер
+  image: string;
+  gallery?: string[];
 
-  // цены (под RU/UZ)
+  // цены (основные поля)
   priceRUB: number;
   priceUZS: number;
-};
 
-// ✅ Backward-compat type: старые компоненты читают price_rub/price_uzs
-export type CatalogProductCompat = CatalogProduct & {
-  price_rub: number;
-  price_uzs: number;
+  // ✅ алиасы для совместимости со старым кодом (НЕ обязаны использоваться, но спасают проект)
+  price_rub?: number;
+  price_uzs?: number;
 };
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -43,7 +41,11 @@ function makeProduct(
   p: Omit<CatalogProduct, "image"> & { basePath: string; coverIndex?: number },
 ) {
   const cover = pad2(p.coverIndex ?? 1);
-  return {
+
+  const priceRUB = Number(p.priceRUB ?? 0) || 0;
+  const priceUZS = Number(p.priceUZS ?? 0) || 0;
+
+  const product: CatalogProduct = {
     id: p.id,
     title: p.title,
     brand: p.brand,
@@ -53,9 +55,15 @@ function makeProduct(
     href: p.href ?? `/product/${p.id}`,
     image: `${p.basePath}/${cover}.jpg`,
     gallery: p.gallery ?? [],
-    priceRUB: p.priceRUB,
-    priceUZS: p.priceUZS,
-  } satisfies CatalogProduct;
+    priceRUB,
+    priceUZS,
+
+    // ✅ совместимость (старые компоненты ждут snake_case)
+    price_rub: priceRUB,
+    price_uzs: priceUZS,
+  };
+
+  return product;
 }
 
 // ✅ коллекции (бренды/серии)
@@ -71,7 +79,6 @@ export const BRANDS: BrandItem[] = [
   // { title: "NEWCOLL", slug: "newcoll" },
 ];
 
-// ✅ разделы/категории (то что у тебя в sidebar)
 export const CATS: CatItem[] = [
   { title: "Фасады", slug: "fasadi" },
   { title: "Комоды", slug: "komody" },
@@ -88,9 +95,10 @@ export const CATS: CatItem[] = [
 
 // ------------------------------------------------------
 // ✅ Текущая коллекция SCANDI
+// public/products/scandi/...
 // ------------------------------------------------------
 
-const BASE_PRODUCTS: CatalogProduct[] = [
+export const CATALOG_MOCK: CatalogProduct[] = [
   makeProduct({
     id: "scandi-fasadi-set",
     title: "SCANDI · Фасады",
@@ -346,18 +354,15 @@ const BASE_PRODUCTS: CatalogProduct[] = [
   // 🔻 ДОБАВЛЕНИЕ ЕЩЁ 5 КОЛЛЕКЦИЙ
   // 1) добавь brand в BRANDS (slug = имя папки в public/products/<slug>/...)
   // 2) ниже вставляй блоки makeProduct(...) по аналогии со SCANDI
-  //    и меняй basePath на "/products/<brand>/<cat>/..."
   // ------------------------------------------------------
 ];
 
-// ✅ Экспорт массива с совместимыми полями price_rub/price_uzs
-export const CATALOG_MOCK: CatalogProductCompat[] = BASE_PRODUCTS.map((p) => ({
-  ...p,
-  price_rub: p.priceRUB,
-  price_uzs: p.priceUZS,
-}));
-
-// ✅ ВАЖНО: CATALOG_BY_ID как Map, чтобы работало .get(...)
-export const CATALOG_BY_ID = new Map<string, CatalogProductCompat>(
+// ✅ быстрый доступ к товару по id: Map (чтобы работал .get())
+export const CATALOG_BY_ID = new Map<string, CatalogProduct>(
   CATALOG_MOCK.map((p) => [String(p.id), p]),
 );
+
+// ✅ запасной вариант: Object-словарь (если где-то было CATALOG_BY_ID[id])
+export const CATALOG_BY_ID_OBJ = Object.fromEntries(
+  CATALOG_MOCK.map((p) => [String(p.id), p]),
+) as Record<string, CatalogProduct>;
