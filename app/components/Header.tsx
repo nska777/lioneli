@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRegionLang } from "../context/region-lang";
 import { getDict, tF } from "@/i18n";
 
@@ -27,7 +27,7 @@ type GlobalFromStrapi = {
     label?: string | null;
     href?: string | null;
     isExternal?: boolean | null;
-    isActive?: boolean | null; // ✅ скрывать/показывать ссылку
+    isActive?: boolean | null;
   }> | null;
   phones?: Array<{
     id?: number;
@@ -43,7 +43,7 @@ type GlobalFromStrapi = {
     addressLine?: string | null;
     workTime?: string | null;
 
-    // UZ (вариант 1)
+    // UZ
     city_uz?: string | null;
     addressLine_uz?: string | null;
     workTime_uz?: string | null;
@@ -52,14 +52,17 @@ type GlobalFromStrapi = {
   }> | null;
 };
 
-function normalizeRegionKey(x: any): RegionKey {
-  return x === "ru" ? "ru" : "uz";
+function normalizeRegionKey(x: unknown): RegionKey {
+  const v = String(x ?? "")
+    .toLowerCase()
+    .trim();
+  return v === "ru" ? "ru" : "uz";
 }
 
-// ✅ защита от падений, если key вдруг undefined/null
-function safeTF(dict: any, key: any, fallback: string) {
+function safeTF(dict: unknown, key: unknown, fallback: string) {
+  if (!dict || typeof dict !== "object") return fallback;
   const k = typeof key === "string" ? key : "";
-  return tF(dict, k, fallback);
+  return tF(dict as any, k, fallback);
 }
 
 export default function Header({
@@ -76,15 +79,19 @@ export default function Header({
   const [callOpen, setCallOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
+  // 1) регион
   const regionKey = normalizeRegionKey(region);
-  const regionMeta: any =
-    (REGION_DATA as any)[regionKey] ?? (REGION_DATA as any).uz;
+  const regionMeta = (REGION_DATA as any)[regionKey] ?? (REGION_DATA as any).uz;
 
-  /**
-   * ✅ TOP LINKS:
-   * - если есть Strapi -> пытаемся распознать label и подставить key (чтобы переводилось)
-   * - иначе -> берём fallback из headerData (labelKey/fallback)
-   */
+  // 2) префикс и подпись региона — всегда из текущего regionKey
+  const phonePrefix = String(REGION_DATA[regionKey].phonePrefix);
+
+  const regionLabel =
+    regionKey === "uz"
+      ? safeTF(dict, "region.uz", "Узбекистан")
+      : safeTF(dict, "region.ru", "Россия");
+
+  // 4) TOP LINKS
   const topLinks = useMemo(() => {
     const normalize = (s: string) =>
       s
@@ -111,7 +118,7 @@ export default function Header({
 
     const fromCmsRaw = (global?.topLinks ?? [])
       .filter(Boolean)
-      .filter((x) => x?.isActive !== false) // ✅ скрываем если isActive=false
+      .filter((x) => x?.isActive !== false)
       .map((x) => ({
         label: (x?.label ?? "").trim(),
         href: (x?.href ?? "").trim(),
@@ -139,7 +146,7 @@ export default function Header({
     }));
   }, [global?.topLinks]);
 
-  // ✅ phone из Strapi по региону, иначе REGION_DATA
+  // 5) phone
   const phone = useMemo(() => {
     const p = (global?.phones ?? []).find(
       (x) => String(x?.region) === regionKey,
@@ -150,12 +157,7 @@ export default function Header({
       : String(regionMeta?.phone ?? "");
   }, [global?.phones, regionKey, regionMeta]);
 
-  /**
-   * ✅ addresses (вариант 1):
-   * - RU берём из city/addressLine/workTime
-   * - UZ берём из city_uz/addressLine_uz/workTime_uz
-   * - если UZ-поля пустые — падаем обратно на RU (чтобы не было пустоты)
-   */
+  // 6) addresses
   const addresses = useMemo(() => {
     const isUzLang = String(lang) === "uz";
 
@@ -166,7 +168,6 @@ export default function Header({
         const addrRaw = isUzLang ? x?.addressLine_uz : x?.addressLine;
         const workRaw = isUzLang ? x?.workTime_uz : x?.workTime;
 
-        // если узбекские поля не заполнены — берём RU, чтобы не было пусто
         const city = String(cityRaw ?? x?.city ?? "").trim();
         const addr = String(addrRaw ?? x?.addressLine ?? "").trim();
         const work = String(workRaw ?? x?.workTime ?? "").trim();
@@ -187,19 +188,14 @@ export default function Header({
     (global?.callCtaLabel ?? "").trim() ||
     safeTF(dict, "header.ui.callMe", "Заказать звонок");
 
-  const regionLabel = safeTF(
-    dict,
-    String(regionMeta?.labelKey ?? "region.uz"),
-    String(regionMeta?.fallback ?? "Узбекистан"),
-  );
-
-  const phonePrefix = String(regionMeta?.phonePrefix ?? "");
+  // ✅ диагностический лог (удали потом)
+  // console.log("CALL MODAL PROPS:", { region, regionKey, phonePrefix, regionLabel });
 
   return (
     <>
       <header className="w-full bg-white">
         <TopBar
-          dict={dict} // ✅ оставил как у тебя
+          dict={dict}
           topLinks={topLinks}
           phone={phone}
           regionTitleKey={String(regionMeta?.labelKey ?? "region.uz")}
@@ -210,7 +206,15 @@ export default function Header({
             setSelectedAddress(a);
             setMapOpen(true);
           }}
-          onOpenCall={() => setCallOpen(true)}
+          onOpenCall={() => {
+            console.log("OPEN CALL:", {
+              region,
+              regionKey,
+              phonePrefix,
+              regionLabel,
+            });
+            setCallOpen(true);
+          }}
           onOpenMobileMenu={() => setMobileOpen(true)}
         />
 
@@ -230,34 +234,7 @@ export default function Header({
         address={selectedAddress}
       />
 
-      <CallModal
-        open={callOpen}
-        onClose={() => setCallOpen(false)}
-        regionLabel={regionLabel}
-        phonePrefix={phonePrefix}
-        regionKey={regionKey}
-        onSubmit={async (data) => {
-          try {
-            const res = await fetch("/api/call-request", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                ...data,
-                region: regionLabel,
-                pageUrl:
-                  typeof window !== "undefined" ? window.location.href : "",
-              }),
-            });
-
-            if (!res.ok) {
-              const text = await res.text();
-              console.error("CALL REQUEST FAILED:", text);
-            }
-          } catch (err) {
-            console.error("CALL REQUEST ERROR:", err);
-          }
-        }}
-      />
+      <CallModal open={callOpen} onClose={() => setCallOpen(false)} />
 
       <MobileMenu
         open={mobileOpen}

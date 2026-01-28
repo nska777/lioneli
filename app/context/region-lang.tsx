@@ -42,10 +42,14 @@ export function RegionLangProvider({
   const [lang, setLangState] = useState<Lang>("ru");
 
   useEffect(() => {
-    const r = (getCookie("region") as Region | null) || "uz";
-    const l = (getCookie("lang") as Lang | null) || "ru";
-    setRegionState(r === "ru" ? "ru" : "uz");
-    setLangState(l === "uz" ? "uz" : "ru");
+    const r = getCookie("region");
+    const l = getCookie("lang");
+
+    const nextRegion: Region = r === "ru" ? "ru" : "uz";
+    const nextLang: Lang = l === "uz" ? "uz" : "ru";
+
+    setRegionState(nextRegion);
+    setLangState(nextLang);
   }, []);
 
   const setRegion = (r: Region) => {

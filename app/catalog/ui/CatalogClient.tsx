@@ -65,10 +65,10 @@ const MODULE_ITEMS = [
   { label: "Витрины", value: "vitrini" },
   { label: "Столы", value: "stoli" },
   { label: "Полки", value: "polki" },
-  { label: "Пуфы", value: "pufy" },
+  { label: "Пуфы", value: "pufi" },
   { label: "Вешалки", value: "veshalki" },
   { label: "Фасады", value: "fasadi" },
-  { label: "Плинтус", value: "plintus" },
+  { label: "Плинтус", value: "plintusy" },
   { label: "Потолки", value: "potolki" },
 ];
 

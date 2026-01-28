@@ -1,389 +1,368 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
-gsap.registerPlugin(ScrollTrigger);
-
-type StrapiImage = {
-  url: string;
-  alternativeText?: string | null;
-  width?: number | null;
-  height?: number | null;
-};
-
-export type SupplyNewsItem = {
-  id: string;
-  title: string;
-  subtitle?: string;
-  slug: string;
-  type?: "arrival" | "expected" | "update";
-  dateLabel?: string;
-  cover?: StrapiImage | null;
-};
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
 
-function clamp(n: number, a: number, b: number) {
-  return Math.max(a, Math.min(b, n));
-}
+export type NewsItem = {
+  id: string;
+  title: string;
+  excerpt: string;
+  dateLabel: string; // "12 JAN"
+  tag?: string; // "COLLECTION"
+  image?: string; // "/news/1.jpg"
+};
 
-export default function SupplyNewsSection({
+export default function NewsSection({
+  items = [
+    {
+      id: "n1",
+      title: "Новая коллекция: мягкая геометрия и тёплые фактуры",
+      excerpt:
+        "Показываем материалы, оттенки и новые решения для гостиной — спокойно и премиально.",
+      dateLabel: "12 JAN",
+      tag: "COLLECTION",
+      image: "/hero/1.jpg",
+    },
+    {
+      id: "n2",
+      title: "Как выбрать ткань: износостойкость без компромиссов",
+      excerpt:
+        "Разбираем параметры, которые реально важны в жизни: плотность, тесты, уход.",
+      dateLabel: "06 JAN",
+      tag: "GUIDE",
+      image: "/hero/2.jpg",
+    },
+    {
+      id: "n3",
+      title: "Доставка и сервис: что входит в стандарт Lioneto",
+      excerpt:
+        "Упаковка, занос, сборка и поддержка — всё объясняем коротко и по делу.",
+      dateLabel: "28 DEC",
+      tag: "SERVICE",
+      image: "/hero/3.jpg",
+    },
+    {
+      id: "n4",
+      title: "Материалы премиум-класса: шпон, массив, честные покрытия",
+      excerpt:
+        "Собрали базу по материалам: как отличить качество и что влияет на срок службы.",
+      dateLabel: "19 DEC",
+      tag: "MATERIALS",
+      image: "/hero/4.jpg",
+    },
+  ] as NewsItem[],
+  href = "/catalog", // временно ведём в каталог
   title = "Новости",
-  items,
-  hrefAll = "/news",
-  autoplayMs = 6200,
+  subtitle = "Только важное: коллекции, сервис и материалы",
 }: {
+  items?: NewsItem[];
+  href?: string;
   title?: string;
-  items: SupplyNewsItem[];
-  hrefAll?: string;
-  autoplayMs?: number; // 0 = выключить
+  subtitle?: string;
 }) {
-  const rootRef = useRef<HTMLElement | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
 
-  const list = useMemo(() => (items ?? []).filter(Boolean), [items]);
-
-  const [perView, setPerView] = useState(3); // 1/2/3
   const [index, setIndex] = useState(0);
-  const [paused, setPaused] = useState(false);
 
-  // drag/swipe
-  const drag = useRef({
-    active: false,
-    startX: 0,
-    startIndex: 0,
-    dx: 0,
-    pointerId: -1,
-  });
+  const reduced = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  }, []);
 
-  // responsive perView
+  const canPrev = index > 0;
+  const canNext = index < Math.max(0, items.length - 1);
+
+  const scrollToIndex = (i: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const cards = Array.from(
+      track.querySelectorAll<HTMLElement>("[data-card]"),
+    );
+    const el = cards[i];
+    if (!el) return;
+
+    const left = el.offsetLeft - 8; // небольшой отступ
+    track.scrollTo({ left, behavior: "smooth" });
+    setIndex(i);
+  };
+
   useEffect(() => {
-    const update = () => {
-      const w = window.innerWidth;
-      if (w < 640) setPerView(1);
-      else if (w < 1024) setPerView(2);
-      else setPerView(3);
+    const track = trackRef.current;
+    if (!track) return;
+
+    const onScroll = () => {
+      // определяем ближайшую карточку к левому краю
+      const cards = Array.from(
+        track.querySelectorAll<HTMLElement>("[data-card]"),
+      );
+      if (!cards.length) return;
+
+      const x = track.scrollLeft;
+      let best = 0;
+      let bestDist = Infinity;
+
+      for (let i = 0; i < cards.length; i++) {
+        const d = Math.abs(cards[i].offsetLeft - x);
+        if (d < bestDist) {
+          bestDist = d;
+          best = i;
+        }
+      }
+      setIndex(best);
     };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+
+    track.addEventListener("scroll", onScroll, { passive: true });
+    return () => track.removeEventListener("scroll", onScroll);
   }, []);
 
-  const maxIndex = Math.max(0, list.length - perView);
-
-  // keep index valid
   useEffect(() => {
-    setIndex((v) => clamp(v, 0, maxIndex));
-  }, [maxIndex]);
+    if (reduced) return;
 
-  // pause when tab hidden
-  useEffect(() => {
-    const onVis = () => setPaused(document.hidden ? true : false);
-    document.addEventListener("visibilitychange", onVis);
-    return () => document.removeEventListener("visibilitychange", onVis);
-  }, []);
-
-  // autoplay (по 1 шагу)
-  useEffect(() => {
-    if (!list.length) return;
-    if (paused) return;
-    if (autoplayMs <= 0) return;
-
-    const id = window.setInterval(() => {
-      setIndex((v) => (v >= maxIndex ? 0 : v + 1));
-    }, autoplayMs);
-
-    return () => window.clearInterval(id);
-  }, [paused, autoplayMs, maxIndex, list.length]);
-
-  const go = (i: number) => setIndex(clamp(i, 0, maxIndex));
-  const next = () => go(index >= maxIndex ? 0 : index + 1);
-  const prev = () => go(index <= 0 ? maxIndex : index - 1);
-
-  // GSAP reveal (как у тебя)
-  useLayoutEffect(() => {
-    if (!rootRef.current) return;
+    gsap.registerPlugin(ScrollTrigger);
+    const root = rootRef.current;
+    if (!root) return;
 
     const ctx = gsap.context(() => {
-      const q = gsap.utils.selector(rootRef);
-      const h = q('[data-news="h"]');
-      const slider = q('[data-news="slider"]');
+      const header = root.querySelector<HTMLElement>("[data-head]");
+      const cards = root.querySelectorAll<HTMLElement>("[data-card]");
 
-      gsap.set(h, { opacity: 0, y: 10 });
-      gsap.set(slider, { opacity: 0, y: 14 });
+      if (header) {
+        const kids = header.querySelectorAll<HTMLElement>("[data-head-item]");
+        gsap.set(kids, { autoAlpha: 0, y: 16 });
+        gsap.to(kids, {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.85,
+          ease: "power3.out",
+          stagger: 0.07,
+          scrollTrigger: { trigger: header, start: "top 88%", once: true },
+        });
+      }
 
-      ScrollTrigger.create({
-        trigger: rootRef.current!,
-        start: "top 80%",
-        once: true,
-        onEnter: () => {
-          gsap.to(h, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" });
-          gsap.to(slider, {
-            opacity: 1,
-            y: 0,
-            duration: 0.75,
-            ease: "power3.out",
-            delay: 0.06,
-          });
-        },
-      });
-    }, rootRef);
+      if (cards.length) {
+        gsap.set(cards, { autoAlpha: 0, y: 18, scale: 0.992 });
+        gsap.to(cards, {
+          autoAlpha: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.9,
+          ease: "power3.out",
+          stagger: 0.08,
+          scrollTrigger: { trigger: root, start: "top 80%", once: true },
+        });
+      }
+    }, root);
 
     return () => ctx.revert();
-  }, []);
-
-  // translate track
-  const translatePct = -(index * (100 / perView));
-
-  // drag handlers (только transform)
-  const onPointerDown = (e: React.PointerEvent) => {
-    if (!trackRef.current) return;
-    drag.current.active = true;
-    drag.current.startX = e.clientX;
-    drag.current.startIndex = index;
-    drag.current.dx = 0;
-    drag.current.pointerId = e.pointerId;
-    setPaused(true);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (!drag.current.active || !trackRef.current) return;
-    if (e.pointerId !== drag.current.pointerId) return;
-
-    drag.current.dx = e.clientX - drag.current.startX;
-
-    const w = trackRef.current.getBoundingClientRect().width;
-    const slideW = w / perView;
-    const deltaSlides = drag.current.dx / slideW;
-
-    trackRef.current.style.transform = `translate3d(calc(${translatePct}% + ${
-      deltaSlides * 100
-    }%), 0, 0)`;
-  };
-
-  const endDrag = () => {
-    if (!drag.current.active || !trackRef.current) return;
-    drag.current.active = false;
-
-    const w = trackRef.current.getBoundingClientRect().width;
-    const slideW = w / perView;
-    const moved = drag.current.dx;
-
-    // порог
-    if (Math.abs(moved) > slideW * 0.18) {
-      if (moved < 0) go(drag.current.startIndex + 1);
-      else go(drag.current.startIndex - 1);
-    } else {
-      go(drag.current.startIndex);
-    }
-
-    trackRef.current.style.transform = "";
-
-    window.setTimeout(() => setPaused(false), 260);
-  };
-
-  const onPointerUp = () => endDrag();
-  const onPointerCancel = () => endDrag();
-
-  // dots (кол-во позиций)
-  const dots = maxIndex + 1;
-
-  if (!list.length) return null;
+  }, [reduced]);
 
   return (
-    <section
-      ref={rootRef}
-      className="mx-auto w-full max-w-[1200px] px-4 py-14"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-    >
-      {/* Header */}
-      <div data-news="h" className="mb-8 flex items-end justify-between">
-        <h2 className="text-[32px] font-semibold tracking-[-0.02em] text-black/90">
-          {title}
-        </h2>
-
-        <div className="flex items-center gap-3">
-          <Link
-            href={hrefAll}
-            className="hidden text-[13px] text-black/60 hover:text-black md:inline"
-            onClick={() => setPaused(true)}
-          >
-            Все новости →
-          </Link>
-
-          {/* Arrows */}
-          {dots > 1 ? (
-            <div className="hidden items-center gap-2 md:flex">
-              <button
-                type="button"
-                onClick={() => {
-                  setPaused(true);
-                  prev();
-                  window.setTimeout(() => setPaused(false), 320);
-                }}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/15 bg-white text-black/70 transition hover:text-black active:scale-[0.98]"
-                aria-label="Previous"
+    <section ref={rootRef} className="bg-white text-black">
+      <div className="mx-auto w-full max-w-[1200px] px-4">
+        {/* Header */}
+        <div data-head className="pt-10 md:pt-14">
+          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div
+                data-head-item
+                className="text-[12px] tracking-[0.18em] text-black/50"
               >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setPaused(true);
-                  next();
-                  window.setTimeout(() => setPaused(false), 320);
-                }}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/15 bg-white text-black/70 transition hover:text-black active:scale-[0.98]"
-                aria-label="Next"
+                LIONETO • NEWS
+              </div>
+              <h2
+                data-head-item
+                className="mt-2 text-[22px] font-semibold tracking-[-0.01em] md:text-[30px]"
               >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+                {title}
+              </h2>
+              <p
+                data-head-item
+                className="mt-2 max-w-2xl text-[14px] leading-7 text-black/70"
+              >
+                {subtitle}
+              </p>
             </div>
-          ) : null}
-        </div>
-      </div>
 
-      {/* Slider */}
-      <div data-news="slider" className="relative">
-        <div
-          className="overflow-hidden"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerCancel}
-          style={{ touchAction: "pan-y" }}
-        >
+            {/* Actions (всё кликабельно) */}
+            <div data-head-item className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => canPrev && scrollToIndex(index - 1)}
+                className={cn(
+                  "group inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border bg-white transition",
+                  canPrev
+                    ? "border-black/15 hover:border-black/25"
+                    : "cursor-not-allowed border-black/10 opacity-50",
+                )}
+                aria-label="Назад"
+              >
+                <ChevronLeft className="h-5 w-5 text-black/70 transition group-hover:-translate-x-0.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => canNext && scrollToIndex(index + 1)}
+                className={cn(
+                  "group inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border bg-white transition",
+                  canNext
+                    ? "border-black/15 hover:border-black/25"
+                    : "cursor-not-allowed border-black/10 opacity-50",
+                )}
+                aria-label="Вперед"
+              >
+                <ChevronRight className="h-5 w-5 text-black/70 transition group-hover:translate-x-0.5" />
+              </button>
+
+              <Link
+                href={href}
+                className="group ml-2 inline-flex cursor-pointer items-center justify-center rounded-full bg-black px-5 py-3 text-[13px] font-medium tracking-[0.12em] text-white transition hover:opacity-90"
+              >
+                В КАТАЛОГ
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Track */}
+        <div className="relative mt-7">
+          {/* Premium fade edges */}
+          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-[linear-gradient(90deg,rgba(255,255,255,1),rgba(255,255,255,0))]" />
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-[linear-gradient(270deg,rgba(255,255,255,1),rgba(255,255,255,0))]" />
+
           <div
             ref={trackRef}
-            className="flex will-change-transform transition-transform duration-500 ease-out"
-            style={{
-              width: `${(list.length * 100) / perView}%`,
-              transform: `translate3d(${translatePct}%, 0, 0)`,
-            }}
+            className={cn(
+              "flex gap-4 overflow-x-auto pb-2 pr-2",
+              "scrollbar-hide snap-x snap-mandatory",
+            )}
           >
-            {list.map((it) => (
-              <div
-                key={it.id}
-                className="shrink-0 px-3"
-                style={{ width: `${100 / list.length}%` }}
+            {items.map((n, i) => (
+              <Link
+                key={n.id}
+                href={href}
+                data-card
+                className={cn(
+                  "group relative min-w-[290px] max-w-[290px] snap-start cursor-pointer",
+                  "overflow-hidden rounded-[28px] border border-black/10 bg-white",
+                  "shadow-[0_18px_60px_rgba(0,0,0,0.06)] transition",
+                  "hover:-translate-y-0.5 hover:border-black/20",
+                  "active:translate-y-0",
+                  "md:min-w-[360px] md:max-w-[360px]",
+                )}
+                aria-label={`Открыть новость: ${n.title}`}
               >
-                <article className="flex flex-col items-center text-center">
-                  {/* image */}
-                  <Link
-                    href={`/news/${it.slug}`}
-                    className={cn(
-                      "relative block w-full overflow-hidden rounded-sm",
-                      "transition-transform duration-300 will-change-transform",
-                      "hover:scale-[1.01]",
-                      "active:scale-[0.995]",
-                    )}
-                    onClick={() => setPaused(true)}
-                  >
-                    <div className="relative aspect-[16/9] w-full bg-black/[0.03]">
-                      {it.cover?.url ? (
-                        <Image
-                          src={it.cover.url}
-                          alt={it.cover.alternativeText || it.title}
-                          fill
-                          sizes="(max-width: 768px) 100vw, 33vw"
-                          className="object-cover"
-                        />
-                      ) : (
-                        <div className="absolute inset-0 grid place-items-center text-[12px] tracking-[0.2em] text-black/40">
-                          NO IMAGE
-                        </div>
-                      )}
+                {/* clickable overlay (на всякий случай, но Link и так кликабельный) */}
+                <span className="absolute inset-0 z-10" />
+
+                {/* top media */}
+                <div className="relative h-[170px] w-full overflow-hidden md:h-[190px]">
+                  {/* soft premium background if no image */}
+                  <div className="absolute inset-0 bg-[radial-gradient(700px_260px_at_30%_0%,rgba(0,0,0,0.08),transparent_60%)]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.03),transparent_55%)]" />
+
+                  {n.image ? (
+                    <Image
+                      src={n.image}
+                      alt={n.title}
+                      fill
+                      sizes="(max-width: 768px) 290px, 360px"
+                      className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                      priority={i < 2}
+                    />
+                  ) : null}
+
+                  {/* top badges */}
+                  <div className="absolute left-4 top-4 z-20 flex items-center gap-2">
+                    {n.tag ? (
+                      <div className="rounded-full border border-black/10 bg-white/85 px-3 py-1 text-[11px] tracking-[0.18em] text-black/70 backdrop-blur-sm">
+                        {n.tag}
+                      </div>
+                    ) : null}
+
+                    <div className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-[11px] tracking-[0.18em] text-black/70">
+                      {n.dateLabel}
                     </div>
-                  </Link>
+                  </div>
 
-                  {/* title */}
-                  <h3 className="mt-5 max-w-[360px] text-[16px] leading-[1.45] text-black/70">
-                    {it.title}
-                  </h3>
+                  {/* subtle shine */}
+                  <div className="pointer-events-none absolute -left-10 -top-10 h-44 w-44 rounded-full bg-black/[0.04] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+                </div>
 
-                  {/* button */}
-                  <Link
-                    href={`/news/${it.slug}`}
-                    className={cn(
-                      "mt-5 inline-flex items-center justify-center",
-                      "h-10 min-w-[150px] px-6",
-                      "border border-black/60 text-[14px] text-black/70",
-                      "transition-transform duration-200 will-change-transform",
-                      "hover:text-black hover:-translate-y-[1px]",
-                      "active:translate-y-0 active:scale-[0.99]",
-                    )}
-                    onClick={() => setPaused(true)}
-                  >
-                    Подробнее
-                  </Link>
-                </article>
-              </div>
+                {/* content */}
+                <div className="relative p-5">
+                  <div className="text-[11px] tracking-[0.18em] text-black/45">
+                    НОВОСТЬ {String(i + 1).padStart(2, "0")}
+                  </div>
+
+                  <div className="mt-2 text-[16px] font-semibold leading-[1.15] tracking-[-0.01em] text-black/85">
+                    {n.title}
+                  </div>
+
+                  <p className="mt-2 text-[13px] leading-6 text-black/65">
+                    {n.excerpt}
+                  </p>
+
+                  {/* footer row (тоже кликабельно — внутри Link) */}
+                  <div className="mt-5 flex items-center justify-between">
+                    <div className="text-[12px] tracking-[0.18em] text-black/45">
+                      ОТКРЫТЬ
+                    </div>
+
+                    <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2 text-[12px] font-medium tracking-[0.12em] text-black/75 transition group-hover:border-black/20">
+                      Читать
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    </div>
+                  </div>
+                </div>
+              </Link>
             ))}
           </div>
         </div>
 
-        {/* Dots */}
-        {dots > 1 ? (
-          <div className="mt-7 flex items-center justify-center gap-2">
-            {Array.from({ length: dots }).map((_, i) => {
-              const active = i === index;
+        {/* bottom mini nav */}
+        <div className="mt-5 flex items-center justify-between pb-10 md:pb-14">
+          <div className="text-[12px] tracking-[0.18em] text-black/45">
+            {String(index + 1).padStart(2, "0")} /{" "}
+            {String(items.length).padStart(2, "0")}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {items.slice(0, 6).map((_, i) => {
+              const on = i === index;
               return (
                 <button
                   key={i}
                   type="button"
-                  aria-label={`Go to ${i + 1}`}
-                  onClick={() => {
-                    setPaused(true);
-                    go(i);
-                    window.setTimeout(() => setPaused(false), 320);
-                  }}
+                  onClick={() => scrollToIndex(i)}
                   className={cn(
-                    "h-2.5 w-2.5 rounded-full border border-black/20 transition-transform",
-                    active
-                      ? "scale-[1.1] bg-black/70"
-                      : "bg-black/10 hover:scale-[1.06]",
+                    "h-2.5 w-2.5 cursor-pointer rounded-full border transition",
+                    on
+                      ? "border-black/35 bg-black/30"
+                      : "border-black/15 bg-white hover:border-black/25",
                   )}
+                  aria-label={`Перейти к новости ${i + 1}`}
                 />
               );
             })}
           </div>
-        ) : null}
 
-        {/* Mobile arrows */}
-        {dots > 1 ? (
-          <div className="mt-6 flex items-center justify-center gap-2 md:hidden">
-            <button
-              type="button"
-              onClick={() => {
-                setPaused(true);
-                prev();
-                window.setTimeout(() => setPaused(false), 320);
-              }}
-              className="inline-flex h-10 min-w-[140px] items-center justify-center gap-2 rounded-full border border-black/15 bg-white px-4 text-[13px] text-black/70 transition active:scale-[0.98]"
-            >
-              <ChevronLeft className="h-4 w-4" /> Назад
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPaused(true);
-                next();
-                window.setTimeout(() => setPaused(false), 320);
-              }}
-              className="inline-flex h-10 min-w-[140px] items-center justify-center gap-2 rounded-full border border-black/15 bg-white px-4 text-[13px] text-black/70 transition active:scale-[0.98]"
-            >
-              Вперёд <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        ) : null}
+          <Link
+            href={href}
+            className="inline-flex cursor-pointer items-center gap-2 text-[12px] tracking-[0.18em] text-black/60 transition hover:text-black"
+          >
+            ВСЕ НОВОСТИ <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
       </div>
     </section>
   );

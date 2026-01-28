@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Send } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -31,7 +32,7 @@ const TAGS: Array<"Все" | NewsTag> = [
   "Событие",
 ];
 
-// ✅ мок — потом заменишь на Strapi (ниже напишу как)
+// ✅ мок — потом заменишь на Strapi
 const mockNews: NewsItem[] = [
   {
     id: "n1",
@@ -101,14 +102,21 @@ function TagPill({
 }
 
 function NewsCard({ item }: { item: NewsItem }) {
+  // ✅ временно ведём в каталог (как ты просил)
+  const href = "/catalog";
+
   return (
-    <article
+    <Link
+      href={href}
       data-reveal
       className={cn(
-        "group relative overflow-hidden rounded-3xl border border-black/10 bg-white",
-        "transition hover:border-black/20",
+        "group relative block cursor-pointer overflow-hidden rounded-3xl border border-black/10 bg-white",
+        "transition hover:-translate-y-0.5 hover:border-black/20",
+        "shadow-[0_18px_60px_rgba(0,0,0,0.06)]",
       )}
+      aria-label={`Открыть новость: ${item.title}`}
     >
+      {/* IMAGE */}
       <div className="relative aspect-[16/10] w-full overflow-hidden">
         {item.image?.url ? (
           <Image
@@ -121,6 +129,7 @@ function NewsCard({ item }: { item: NewsItem }) {
         ) : (
           <div className="absolute inset-0 bg-black/[0.04]" />
         )}
+
         <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.35),transparent_55%)]" />
 
         <div className="absolute left-4 top-4">
@@ -139,26 +148,30 @@ function NewsCard({ item }: { item: NewsItem }) {
         </div>
       </div>
 
+      {/* CONTENT */}
       <div className="p-6">
         <p className="text-[14px] leading-7 text-black/70">{item.excerpt}</p>
 
         <div className="mt-5 flex items-center justify-between">
-          <Link
-            href={`/news/${item.slug}`}
-            className="inline-flex cursor-pointer items-center gap-2 text-[12px] font-medium tracking-[0.18em] text-black/80 transition hover:text-black"
-          >
+          {/* ✅ УБРАЛИ вложенный Link — теперь просто текст/стрелка */}
+          <div className="inline-flex items-center gap-2 text-[12px] font-medium tracking-[0.18em] text-black/80 transition group-hover:text-black">
             ЧИТАТЬ{" "}
             <span className="transition-transform group-hover:translate-x-0.5">
               →
             </span>
-          </Link>
+          </div>
 
           <span className="text-[11px] tracking-[0.18em] text-black/40">
             LIONETO
           </span>
         </div>
       </div>
-    </article>
+
+      {/* subtle hover shine */}
+      <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100">
+        <div className="absolute -left-10 -top-10 h-44 w-44 rounded-full bg-black/[0.03]" />
+      </div>
+    </Link>
   );
 }
 
@@ -187,11 +200,10 @@ export default function NewsPageClient() {
       targets.forEach((el) => {
         gsap.fromTo(
           el,
-          { autoAlpha: 0, y: 18, filter: "blur(10px)" },
+          { autoAlpha: 0, y: 18 },
           {
             autoAlpha: 1,
             y: 0,
-            filter: "blur(0px)",
             duration: 0.8,
             ease: "power3.out",
             scrollTrigger: {
@@ -214,7 +226,7 @@ export default function NewsPageClient() {
       <div
         className={cn(
           "sticky top-0 z-10 -mx-4 mb-6 border-y border-black/10 bg-white/80 px-4 py-4 backdrop-blur",
-          "md:static md:mx-0 md:mb-8 md:border md:rounded-3xl md:py-5",
+          "md:static md:mx-0 md:mb-8 md:rounded-3xl md:border md:py-5",
         )}
       >
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -259,7 +271,7 @@ export default function NewsPageClient() {
         </div>
       )}
 
-      {/* Подписка */}
+      {/* Подписка -> TELEGRAM */}
       <div
         data-reveal
         className="mt-10 rounded-3xl border border-black/10 bg-black/[0.02] p-6 md:p-10"
@@ -270,7 +282,7 @@ export default function NewsPageClient() {
               ПОДПИСКА НА НОВОСТИ
             </div>
             <div className="mt-2 text-[18px] font-semibold tracking-[-0.01em] md:text-[26px]">
-              Получайте поступления и акции на почту
+              Получайте поступления и акции в Telegram
             </div>
             <p className="mt-3 text-[14px] leading-7 text-black/70">
               Без спама. Только важные обновления по бренду и коллекциям.
@@ -278,30 +290,28 @@ export default function NewsPageClient() {
           </div>
 
           <div className="md:col-span-5">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                // TODO: тут подключим реальную подписку (Strapi/Sendgrid/Mailchimp)
-                alert("Готово! (пока мок, дальше подключим реальную отправку)");
+            <a
+              href="https://t.me/your_channel" // реальный канал
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                "inline-flex w-full cursor-pointer items-center justify-center gap-2",
+                "rounded-2xl px-5 py-3",
+                "text-[12px] font-medium tracking-[0.18em] text-white",
+                "transition active:scale-[0.99]",
+              )}
+              style={{
+                backgroundColor: "#11aade",
               }}
-              className="flex flex-col gap-3"
             >
-              <input
-                type="email"
-                required
-                placeholder="your@email.com"
-                className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-[14px] text-black/80 outline-none transition focus:border-black/25"
-              />
-              <button
-                type="submit"
-                className="inline-flex cursor-pointer items-center justify-center rounded-2xl bg-black px-4 py-3 text-[12px] font-medium tracking-[0.18em] text-white transition hover:opacity-90"
-              >
-                ПОДПИСАТЬСЯ
-              </button>
-              <div className="text-[11px] leading-5 text-black/45">
-                Нажимая «Подписаться», вы соглашаетесь на обработку данных.
-              </div>
-            </form>
+              <Send className="h-4 w-4" />
+              ПЕРЕЙТИ В TELEGRAM-КАНАЛ
+            </a>
+
+            <div className="mt-3 text-[11px] leading-5 text-black/45">
+              Нажимая кнопку, вы переходите в официальный Telegram-канал
+              Lioneto.
+            </div>
           </div>
         </div>
       </div>
