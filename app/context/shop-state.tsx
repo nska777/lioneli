@@ -9,31 +9,61 @@ import React, {
   useState,
 } from "react";
 
-type CartMap = Record<string, number>; // id -> qty
+/**
+ * ✅ ВАЖНО:
+ * - Чтобы один и тот же товар мог быть в корзине/избранном в разных вариантах,
+ *   ключ становится: productId::variantId
+ * - При этом мы сохраняем совместимость со старым кодом:
+ *   toggleFav(productId) / addToCart(productId) продолжают работать
+ *   (они будут использовать дефолтный вариант "base").
+ */
 
-type OneClick = { id: string; qty: number } | null;
+export type VariantRef = {
+  id: string; // variantId (например "white", "with-lift")
+  title?: string; // "Белая", "С подъёмным механизмом" (необязательно хранить, но удобно)
+};
+
+export type ItemKey = string; // "productId::variantId"
+
+type CartMap = Record<ItemKey, number>; // key -> qty
+
+type OneClick = { id: ItemKey; qty: number } | null;
 
 export type ShopState = {
-  favorites: string[];
-  isFav: (id: string) => boolean;
-  toggleFav: (id: string) => void;
+  // ✅ favorites теперь хранит ключи (id::variantId)
+  favorites: ItemKey[];
+  isFav: (productId: string, variantId?: string) => boolean;
+  toggleFav: (productId: string, variant?: VariantRef | string) => void;
   favCount: number;
 
+  // ✅ cart теперь хранит ключи (id::variantId)
   cart: CartMap;
   cartCount: number;
-  isInCart: (id: string) => boolean;
+  isInCart: (productId: string, variantId?: string) => boolean;
 
-  addToCart: (id: string, qty?: number) => void;
-  removeFromCart: (id: string) => void;
-  toggleCart: (id: string) => void;
+  addToCart: (
+    productId: string,
+    qty?: number,
+    variant?: VariantRef | string,
+  ) => void;
+  removeFromCart: (productId: string, variantId?: string) => void;
+  toggleCart: (productId: string, variant?: VariantRef | string) => void;
 
-  setCartQty: (id: string, qty: number) => void;
+  setCartQty: (productId: string, qty: number, variantId?: string) => void;
   clearCart: () => void;
 
-  // ✅ one-click режим (checkout?mode=oneclick)
+  // ✅ one-click режим (checkout?mode=oneclick) — тоже по ключу itemKey
   oneClick: OneClick;
-  setOneClick: (id: string, qty?: number) => void;
+  setOneClick: (
+    productId: string,
+    qty?: number,
+    variant?: VariantRef | string,
+  ) => void;
   clearOneClick: () => void;
+
+  // ✅ утилиты (удобно использовать в UI)
+  makeKey: (productId: string, variantId?: string) => ItemKey;
+  parseKey: (key: ItemKey) => { productId: string; variantId: string };
 };
 
 const Ctx = createContext<ShopState | null>(null);
@@ -51,22 +81,84 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   }
 }
 
+const DEFAULT_VARIANT_ID = "base";
+const SEP = "::";
+
+function normVariantId(v?: string) {
+  const s = String(v ?? "").trim();
+  return s ? s : DEFAULT_VARIANT_ID;
+}
+
+function makeKey(productId: string, variantId?: string): ItemKey {
+  return `${String(productId)}${SEP}${normVariantId(variantId)}`;
+}
+
+function parseKey(key: ItemKey) {
+  const raw = String(key);
+  const idx = raw.indexOf(SEP);
+  if (idx === -1) {
+    // старые ключи без варианта — считаем base
+    return { productId: raw, variantId: DEFAULT_VARIANT_ID };
+  }
+  return {
+    productId: raw.slice(0, idx),
+    variantId: normVariantId(raw.slice(idx + SEP.length)),
+  };
+}
+
+function pickVariantId(variant?: VariantRef | string) {
+  if (!variant) return DEFAULT_VARIANT_ID;
+  if (typeof variant === "string") return normVariantId(variant);
+  return normVariantId(variant.id);
+}
+
+function migrateFavorites(raw: any): ItemKey[] {
+  if (!Array.isArray(raw)) return [];
+  // было: ["productId", ...]
+  // стало: ["productId::base", ...] (или уже новые ключи)
+  return raw
+    .map((x) => String(x))
+    .filter(Boolean)
+    .map((s) => (s.includes(SEP) ? s : makeKey(s, DEFAULT_VARIANT_ID)));
+}
+
+function migrateCart(raw: any): CartMap {
+  if (!raw || typeof raw !== "object") return {};
+  const out: CartMap = {};
+  for (const [k0, v0] of Object.entries(raw)) {
+    const qty = Math.max(0, Math.floor(Number(v0 || 0)));
+    if (qty <= 0) continue;
+
+    const k = String(k0);
+    const key = k.includes(SEP) ? k : makeKey(k, DEFAULT_VARIANT_ID);
+    out[key] = (out[key] ?? 0) + qty;
+  }
+  return out;
+}
+
+function migrateOneClick(raw: any): OneClick {
+  if (!raw || typeof raw !== "object") return null;
+  const id = raw?.id ? String(raw.id) : "";
+  const qty = Math.max(1, Math.floor(Number(raw?.qty || 1)));
+  if (!id) return null;
+  const key = id.includes(SEP) ? id : makeKey(id, DEFAULT_VARIANT_ID);
+  return { id: key, qty };
+}
+
 export function ShopStateProvider({ children }: { children: React.ReactNode }) {
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<ItemKey[]>([]);
   const [cart, setCart] = useState<CartMap>({});
   const [oneClick, setOneClickState] = useState<OneClick>(null);
 
   // init from localStorage
   useEffect(() => {
-    const fav = safeParse<string[]>(localStorage.getItem(LS_FAV), []);
-    const crt = safeParse<CartMap>(localStorage.getItem(LS_CART), {});
-    const oc = safeParse<OneClick>(localStorage.getItem(LS_ONECLICK), null);
+    const favRaw = safeParse<any>(localStorage.getItem(LS_FAV), []);
+    const cartRaw = safeParse<any>(localStorage.getItem(LS_CART), {});
+    const ocRaw = safeParse<any>(localStorage.getItem(LS_ONECLICK), null);
 
-    setFavorites(Array.isArray(fav) ? fav : []);
-    setCart(crt && typeof crt === "object" ? crt : {});
-    setOneClickState(
-      oc?.id ? { id: String(oc.id), qty: Math.max(1, oc.qty || 1) } : null,
-    );
+    setFavorites(migrateFavorites(favRaw));
+    setCart(migrateCart(cartRaw));
+    setOneClickState(migrateOneClick(ocRaw));
   }, []);
 
   // persist
@@ -83,58 +175,84 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
   }, [oneClick]);
 
   const api = useMemo<ShopState>(() => {
-    const isFav = (id: string) => favorites.includes(id);
+    const isFav = (productId: string, variantId?: string) => {
+      const key = makeKey(productId, variantId);
+      return favorites.includes(key);
+    };
 
-    const toggleFav = (id: string) => {
+    const toggleFav = (productId: string, variant?: VariantRef | string) => {
+      const vid = pickVariantId(variant);
+      const key = makeKey(productId, vid);
+
       setFavorites((prev) =>
-        prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+        prev.includes(key) ? prev.filter((x) => x !== key) : [...prev, key],
       );
     };
 
-    const isInCart = (id: string) => (cart[id] ?? 0) > 0;
-
-    const addToCart = (id: string, qty = 1) => {
-      const q = Math.max(1, Math.floor(qty || 1));
-      setCart((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + q }));
+    const isInCart = (productId: string, variantId?: string) => {
+      const key = makeKey(productId, variantId);
+      return (cart[key] ?? 0) > 0;
     };
 
-    const removeFromCart = (id: string) => {
+    const addToCart = (
+      productId: string,
+      qty = 1,
+      variant?: VariantRef | string,
+    ) => {
+      const q = Math.max(1, Math.floor(qty || 1));
+      const key = makeKey(productId, pickVariantId(variant));
+
+      setCart((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + q }));
+    };
+
+    const removeFromCart = (productId: string, variantId?: string) => {
+      const key = makeKey(productId, variantId);
+
       setCart((prev) => {
         const n = { ...prev };
-        delete n[id];
+        delete n[key];
         return n;
       });
     };
 
-    const toggleCart = (id: string) => {
+    const toggleCart = (productId: string, variant?: VariantRef | string) => {
+      const key = makeKey(productId, pickVariantId(variant));
+
       setCart((prev) => {
-        const exists = (prev[id] ?? 0) > 0;
+        const exists = (prev[key] ?? 0) > 0;
         if (exists) {
           const n = { ...prev };
-          delete n[id];
+          delete n[key];
           return n;
         }
-        return { ...prev, [id]: 1 };
+        return { ...prev, [key]: 1 };
       });
     };
 
-    const setCartQty = (id: string, qty: number) => {
+    const setCartQty = (productId: string, qty: number, variantId?: string) => {
+      const key = makeKey(productId, variantId);
+
       setCart((prev) => {
         const q = Math.max(0, Math.floor(qty || 0));
         if (q <= 0) {
           const n = { ...prev };
-          delete n[id];
+          delete n[key];
           return n;
         }
-        return { ...prev, [id]: q };
+        return { ...prev, [key]: q };
       });
     };
 
     const clearCart = () => setCart({});
 
-    const setOneClick = (id: string, qty = 1) => {
+    const setOneClick = (
+      productId: string,
+      qty = 1,
+      variant?: VariantRef | string,
+    ) => {
       const q = Math.max(1, Math.floor(qty || 1));
-      setOneClickState({ id: String(id), qty: q });
+      const key = makeKey(productId, pickVariantId(variant));
+      setOneClickState({ id: key, qty: q });
     };
 
     const clearOneClick = () => setOneClickState(null);
@@ -162,6 +280,9 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
       oneClick,
       setOneClick,
       clearOneClick,
+
+      makeKey,
+      parseKey,
     };
   }, [favorites, cart, oneClick]);
 

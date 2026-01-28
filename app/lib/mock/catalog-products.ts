@@ -5,6 +5,21 @@
 export type BrandItem = { title: string; slug: string };
 export type CatItem = { title: string; slug: string };
 
+// ✅ Варианты товара (цвет / модификация)
+// Сейчас — на моках. Потом 1-в-1 уедет в Strapi (title + variants).
+export type CatalogVariant = {
+  id: string; // "white" | "cappuccino" | "with-lift" ...
+  title: string; // "Белая" | "Капучино" | "С подъёмным механизмом" ...
+  kind: "color" | "option";
+  // ✅ временная наценка/скидка (для "с механизмом" тестово)
+  priceDeltaRUB?: number;
+  priceDeltaUZS?: number;
+
+  // ✅ если вариант связан с конкретным фото (например, цвет)
+  image?: string; // cover for variant
+  gallery?: string[]; // optional override gallery for variant
+};
+
 export type CatalogProduct = {
   id: string;
   title: string;
@@ -26,6 +41,9 @@ export type CatalogProduct = {
   priceRUB: number;
   priceUZS: number;
 
+  // ✅ варианты (цвет / модификация)
+  variants?: CatalogVariant[];
+
   // ✅ алиасы для совместимости со старым кодом (НЕ обязаны использоваться, но спасают проект)
   price_rub?: number;
   price_uzs?: number;
@@ -38,7 +56,10 @@ function makeGallery(basePath: string, count: number) {
 }
 
 function makeProduct(
-  p: Omit<CatalogProduct, "image"> & { basePath: string; coverIndex?: number },
+  p: Omit<CatalogProduct, "image" | "price_rub" | "price_uzs"> & {
+    basePath: string;
+    coverIndex?: number;
+  },
 ) {
   const cover = pad2(p.coverIndex ?? 1);
 
@@ -57,6 +78,7 @@ function makeProduct(
     gallery: p.gallery ?? [],
     priceRUB,
     priceUZS,
+    variants: Array.isArray(p.variants) ? p.variants : undefined,
 
     // ✅ совместимость (старые компоненты ждут snake_case)
     price_rub: priceRUB,
@@ -131,6 +153,7 @@ export const CATALOG_MOCK: CatalogProduct[] = [
     priceUZS: 8500000,
   }),
 
+  // ✅ КРОВАТИ: вариант "с подъёмным механизмом" (тестовая наценка)
   makeProduct({
     id: "scandi-krovati-krovati-max",
     title: "Кровать MAX",
@@ -140,6 +163,10 @@ export const CATALOG_MOCK: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/krovati/krovati-max", 9),
     priceRUB: 149900,
     priceUZS: 21500000,
+    variants: [
+      { id: "no-lift", title: "Без механизма", kind: "option", priceDeltaRUB: 0, priceDeltaUZS: 0 },
+      { id: "with-lift", title: "С подъёмным механизмом", kind: "option", priceDeltaRUB: 14000, priceDeltaUZS: 2000000 },
+    ],
   }),
   makeProduct({
     id: "scandi-krovati-krovati-min",
@@ -150,6 +177,10 @@ export const CATALOG_MOCK: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/krovati/krovati-min", 5),
     priceRUB: 129900,
     priceUZS: 18900000,
+    variants: [
+      { id: "no-lift", title: "Без механизма", kind: "option", priceDeltaRUB: 0, priceDeltaUZS: 0 },
+      { id: "with-lift", title: "С подъёмным механизмом", kind: "option", priceDeltaRUB: 14000, priceDeltaUZS: 2000000 },
+    ],
   }),
 
   makeProduct({
@@ -287,6 +318,8 @@ export const CATALOG_MOCK: CatalogProduct[] = [
     priceUZS: 8100000,
   }),
 
+  // ✅ ВЕШАЛКА: 2 фото = 2 цвета (Белая, Капучино)
+  // Варианты привязаны к соответствующему фото из галереи.
   makeProduct({
     id: "scandi-veshalki-set",
     title: "Вешалка",
@@ -296,6 +329,22 @@ export const CATALOG_MOCK: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/veshalki", 2),
     priceRUB: 12900,
     priceUZS: 1900000,
+    variants: [
+      {
+        id: "white",
+        title: "Белая",
+        kind: "color",
+        image: "/products/scandi/veshalki/01.jpg",
+        gallery: ["/products/scandi/veshalki/01.jpg"],
+      },
+      {
+        id: "cappuccino",
+        title: "Капучино",
+        kind: "color",
+        image: "/products/scandi/veshalki/02.jpg",
+        gallery: ["/products/scandi/veshalki/02.jpg"],
+      },
+    ],
   }),
 
   makeProduct({

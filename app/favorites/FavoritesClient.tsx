@@ -1,3 +1,4 @@
+// app/favorites/FavoritesClient.tsx
 "use client";
 
 import React, { useMemo } from "react";
@@ -42,37 +43,93 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
+type VariantAny = {
+  id: string;
+  title?: string;
+  priceDeltaRUB?: number;
+  priceDeltaUZS?: number;
+  image?: string;
+};
+
 export default function FavoritesClient() {
   const { region } = useRegionLang();
   const shop = useShopState();
 
-  const favIds = shop.favorites;
+  // ✅ keys вида productId::variantId
+  const favKeys = shop.favorites;
 
   const items = useMemo(() => {
-    return favIds
-      .map((id) => {
-        const p = CATALOG_BY_ID.get(id);
+    return favKeys
+      .map((key) => {
+        const k = String(key);
+        const { productId, variantId } = shop.parseKey(k);
+
+        const p = CATALOG_BY_ID.get(String(productId));
         if (!p) return null;
 
-        const price = region === "uz" ? p.price_uzs : p.price_rub;
+        const variants: VariantAny[] = Array.isArray((p as any).variants)
+          ? ((p as any).variants as VariantAny[])
+          : [];
 
-        return { id, product: p, price };
+        const variant =
+          variantId && variantId !== "base"
+            ? (variants.find((v) => String(v.id) === String(variantId)) ?? null)
+            : null;
+
+        const basePriceRaw =
+          region === "uz" ? (p as any).price_uzs : (p as any).price_rub;
+
+        // ✅ защита от строк/undefined
+        const basePrice = Number(basePriceRaw ?? 0) || 0;
+
+        const deltaRaw =
+          region === "uz"
+            ? Number(variant?.priceDeltaUZS ?? 0)
+            : Number(variant?.priceDeltaRUB ?? 0);
+
+        const delta = Number(deltaRaw ?? 0) || 0;
+
+        const price = basePrice + delta;
+
+        const variantTitle = variant?.title ? String(variant.title) : null;
+
+        // ✅ картинка варианта, если есть
+        const image =
+          (variant?.image ? String(variant.image) : "") || (p as any).image;
+
+        return {
+          key: k,
+          productId: String(productId),
+          variantId: String(variantId),
+          variantTitle,
+          product: p,
+          price,
+          image: String(image || ""),
+        };
       })
       .filter(Boolean) as Array<{
-      id: string;
+      key: string;
+      productId: string;
+      variantId: string;
+      variantTitle: string | null;
       product: (typeof CATALOG_MOCK)[number];
       price: number;
+      image: string;
     }>;
-  }, [favIds, region]);
+  }, [favKeys, region, shop]);
 
-  // рекомендации: 3 товара, которых нет в избранном
+  // рекомендации: 3 товара, которых нет в избранном (по productId)
   const recommended = useMemo(() => {
-    const set = new Set(favIds);
-    return CATALOG_MOCK.filter((p) => !set.has(p.id)).slice(0, 3);
-  }, [favIds]);
+    const set = new Set(favKeys.map((k) => shop.parseKey(String(k)).productId));
+    return CATALOG_MOCK.filter((p) => !set.has(String(p.id))).slice(0, 3);
+  }, [favKeys, shop]);
 
   const clearFavorites = () => {
-    favIds.forEach((id) => shop.toggleFav(id));
+    // ✅ корректно убираем каждый ключ (а не productId)
+    favKeys.forEach((key) => {
+      const { productId, variantId } = shop.parseKey(String(key));
+      shop.toggleFav(productId, variantId);
+    });
   };
 
   return (
@@ -140,36 +197,47 @@ export default function FavoritesClient() {
           ) : (
             items.map((it) => (
               <div
-                key={it.id}
+                key={it.key}
                 className="rounded-3xl border border-black/10 bg-white p-4 md:p-5"
               >
                 <div className="flex gap-4">
-                  {/* ✅ было /catalog?product=... -> стало /product/{id} */}
                   <Link
-                    href={`/product/${it.product.id}`}
+                    href={`/product/${it.productId}`}
                     className="cursor-pointer relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-black/5"
                   >
-                    <SafeImage src={it.product.image} alt={it.product.title} />
+                    <SafeImage src={it.image} alt={it.product.title} />
                   </Link>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        {/* ✅ было /catalog?product=... -> стало /product/{id} */}
                         <Link
-                          href={`/product/${it.product.id}`}
+                          href={`/product/${it.productId}`}
                           className="cursor-pointer block truncate text-base font-medium tracking-[-0.01em] hover:underline"
                         >
                           {it.product.title}
                         </Link>
+
+                        {/* ✅ показываем выбранный вариант */}
+                        {it.variantTitle && it.variantId !== "base" ? (
+                          <div className="mt-1 text-[12px] text-black/55">
+                            Вариант:{" "}
+                            <span className="font-semibold text-black/75">
+                              {it.variantTitle}
+                            </span>
+                          </div>
+                        ) : null}
+
                         <div className="mt-1 text-xs text-black/45">
-                          ID: {it.product.id}
+                          ID: {it.productId}
                         </div>
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => shop.toggleFav(it.id)}
+                        onClick={() =>
+                          shop.toggleFav(it.productId, it.variantId)
+                        }
                         className="cursor-pointer inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white text-black/65 hover:text-black hover:border-black/20 transition"
                         title="Убрать из избранного"
                         aria-label="Убрать из избранного"
@@ -188,9 +256,8 @@ export default function FavoritesClient() {
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-3">
-                      {/* ✅ было /catalog?product=... -> стало /product/{id} */}
                       <Link
-                        href={`/product/${it.product.id}`}
+                        href={`/product/${it.productId}`}
                         className="cursor-pointer inline-flex items-center justify-center rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black/75 hover:text-black hover:border-black/20 transition"
                       >
                         Смотреть
@@ -199,7 +266,8 @@ export default function FavoritesClient() {
                       <button
                         type="button"
                         onClick={() => {
-                          shop.toggleCart(it.id);
+                          // ✅ не toggle, а гарантированное добавление выбранного варианта
+                          shop.addToCart(it.productId, 1, it.variantId);
                           window.location.href = "/cart";
                         }}
                         className="cursor-pointer inline-flex items-center justify-center rounded-full bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90 transition"
@@ -232,7 +300,7 @@ export default function FavoritesClient() {
             {recommended.map((p) => (
               <Link
                 key={p.id}
-                href={`/product/${p.id}`} // ✅ было /catalog?product=... -> стало /product/{id}
+                href={`/product/${p.id}`}
                 className="group flex items-center gap-3 rounded-2xl border border-black/10 bg-white p-3 hover:border-black/20 transition cursor-pointer"
               >
                 <div className="relative h-12 w-12 overflow-hidden rounded-xl bg-black/5 shrink-0">
@@ -261,8 +329,6 @@ export default function FavoritesClient() {
               Ещё товары
             </Link>
           </div>
-
-          <p className="mt-4 text-xs leading-relaxed text-black/45"></p>
         </aside>
       </div>
     </main>

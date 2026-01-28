@@ -1,3 +1,4 @@
+// app/product/[id]/ui/ProductClient.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -31,6 +32,16 @@ type MegaPreview = {
   b: string;
 };
 
+type ProductVariant = {
+  id: string; // "white" | "with-lift" | ...
+  title: string; // "Белая" | "С подъёмным механизмом" | ...
+  kind: "color" | "option";
+  priceDeltaRUB?: number;
+  priceDeltaUZS?: number;
+  image?: string;
+  gallery?: string[];
+};
+
 type ProductPageModel = {
   id: string;
   title: string;
@@ -57,6 +68,9 @@ type ProductPageModel = {
     badge?: string;
   }>;
 
+  // ✅ варианты (цвет/модификация)
+  variants?: ProductVariant[];
+
   // UX-связка
   brand?: string;
   category?: string;
@@ -81,22 +95,71 @@ export default function ProductClient({
   const shop = useShopState();
   const { isFav, toggleFav, isInCart, addToCart, removeFromCart } = shop;
 
-  // ✅ 1) нормализуем галерею
-  const galleryRaw = useMemo(() => {
-    const g = Array.isArray(product.gallery)
-      ? product.gallery.filter(Boolean)
-      : [];
-    const base = g.length ? g : [product.image].filter(Boolean);
-    // уникальные
-    const uniq: string[] = [];
-    for (const src of base.map(String))
-      if (src && !uniq.includes(src)) uniq.push(src);
-    return uniq.length ? uniq : [product.image].filter(Boolean);
-  }, [product.gallery, product.image]);
+  // ✅ variants
+  const variants = useMemo<ProductVariant[]>(
+    () => (Array.isArray(product.variants) ? product.variants : []),
+    [product.variants],
+  );
 
-  // ✅ 2) ВАЖНОЕ ТРЕБОВАНИЕ:
-  // Для МОДУЛЯ (обычного товара): максимум 3 изображения (1 основное + 0–2 мини)
-  // Для ВИТРИНЫ (коллекции): оставляем как есть (можно 4+)
+  const defaultVariantId = variants.length ? String(variants[0].id) : "base";
+  const [selectedVariantId, setSelectedVariantId] =
+    useState<string>(defaultVariantId);
+
+  // ✅ если пришёл другой товар — сбрасываем на дефолтный вариант
+  useEffect(() => {
+    setSelectedVariantId(defaultVariantId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id]);
+
+  const selectedVariant = useMemo(() => {
+    if (!variants.length) return null;
+    return (
+      variants.find((v) => String(v.id) === String(selectedVariantId)) ??
+      variants[0] ??
+      null
+    );
+  }, [variants, selectedVariantId]);
+
+  const variantsKind = useMemo<"color" | "option" | null>(() => {
+    if (!variants.length) return null;
+    const k = variants[0]?.kind;
+    return k === "color" || k === "option" ? k : "option";
+  }, [variants]);
+
+  const variantDelta = useMemo(() => {
+    if (!selectedVariant) return 0;
+    return currency === "RUB"
+      ? Number(selectedVariant.priceDeltaRUB ?? 0) || 0
+      : Number(selectedVariant.priceDeltaUZS ?? 0) || 0;
+  }, [selectedVariant, currency]);
+
+  // ✅ 1) нормализуем галерею (с учётом варианта)
+  const galleryRaw = useMemo(() => {
+    // если вариант задаёт свою галерею — используем её
+    const vg = selectedVariant?.gallery?.filter(Boolean) ?? [];
+    const variantGallery = vg.length ? vg : [];
+
+    const g = variantGallery.length
+      ? variantGallery
+      : Array.isArray(product.gallery)
+        ? product.gallery.filter(Boolean)
+        : [];
+
+    const base = g.length ? g : [product.image].filter(Boolean);
+
+    const uniq: string[] = [];
+    for (const src of base.map(String)) {
+      if (src && !uniq.includes(src)) uniq.push(src);
+    }
+
+    // если вариант задаёт "image" и его нет в списке — добавим вперед
+    const vi = selectedVariant?.image ? String(selectedVariant.image) : "";
+    if (vi && !uniq.includes(vi)) uniq.unshift(vi);
+
+    return uniq.length ? uniq : [product.image].filter(Boolean);
+  }, [product.gallery, product.image, selectedVariant]);
+
+  // ✅ 2) Для обычного товара: максимум 3 изображения
   const gallery = useMemo(() => {
     if (product.isCollection) return galleryRaw;
     return galleryRaw.slice(0, 3);
@@ -111,14 +174,13 @@ export default function ProductClient({
 
   const maxLen = Math.max(1, gallery.length);
 
-  // ✅ Правка 1: при смене товара/галереи — сбрасываем состояния lightbox + индексы
+  // ✅ при смене товара/варианта — сбрасываем индексы и лайтбокс
   useEffect(() => {
     setActiveIdx(0);
     setLightboxIdx(0);
     setLightboxOpen(false);
-  }, [product.id]);
+  }, [product.id, selectedVariantId]);
 
-  // ✅ если галерея стала короче — фиксируем activeIdx + lightboxIdx
   useEffect(() => {
     const last = Math.max(0, gallery.length - 1);
     if (activeIdx > last) setActiveIdx(0);
@@ -126,36 +188,36 @@ export default function ProductClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gallery.length]);
 
-  const fav = isFav(product.id);
-  const inCart = isInCart(product.id);
+  const fav = isFav(product.id, selectedVariantId);
+  const inCart = isInCart(product.id, selectedVariantId);
 
-  const unitPrice = currency === "RUB" ? product.price_rub : product.price_uzs;
+  const baseUnitPrice =
+    currency === "RUB" ? product.price_rub : product.price_uzs;
+
+  const unitPrice = baseUnitPrice + variantDelta;
   const totalPrice = unitPrice * qty;
 
   const toggleMainCart = () => {
-    if (inCart) removeFromCart(product.id);
-    else addToCart(product.id, qty);
+    if (inCart) removeFromCart(product.id, selectedVariantId);
+    else addToCart(product.id, qty, selectedVariantId);
   };
 
   const nextMain = () => setActiveIdx((v) => (v + 1) % maxLen);
   const prevMain = () => setActiveIdx((v) => (v - 1 + maxLen) % maxLen);
 
-  // ✅ Правка 3: оставляем ТОЛЬКО одну openLightbox(idx) и синхроним индексы
   const openLightbox = (idx: number) => {
-    setActiveIdx(idx); // синхроним main
-    setLightboxIdx(idx); // синхроним lightbox
+    setActiveIdx(idx);
+    setLightboxIdx(idx);
     setLightboxOpen(true);
   };
 
   const nextLb = () => setLightboxIdx((v) => (v + 1) % maxLen);
   const prevLb = () => setLightboxIdx((v) => (v - 1 + maxLen) % maxLen);
 
-  // ✅ Правка 2: если лайтбокс открылся — держим его индекс равным activeIdx
   useEffect(() => {
     if (lightboxOpen) setLightboxIdx(activeIdx);
   }, [lightboxOpen, activeIdx]);
 
-  // esc закрывает, стрелки листают
   useEffect(() => {
     if (!lightboxOpen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -173,10 +235,8 @@ export default function ProductClient({
     !!product.collectionLabel &&
     !!product.categoryLabel;
 
-  // ✅ для витрины коллекции скрываем правый блок "Коллекция"
   const showCollectionCard = hasCollection && !product.isCollection;
 
-  // ✅ миниатюры: 0–2 (а значит максимум 3 картинки всего)
   const showThumbs = gallery.length > 1;
   const thumbsCols =
     gallery.length === 2
@@ -234,7 +294,7 @@ export default function ProductClient({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => toggleFav(product.id)}
+            onClick={() => toggleFav(product.id, selectedVariantId)}
             className={cn(
               "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2",
               "border-black/10 bg-white text-[13px] text-black/75 hover:border-black/20 hover:text-black transition",
@@ -265,7 +325,6 @@ export default function ProductClient({
         {/* LEFT */}
         <section>
           <div className="relative aspect-square overflow-hidden rounded-3xl bg-black/[0.03]">
-            {/* кликом по фото — открываем лайтбокс с текущим activeIdx */}
             <button
               type="button"
               onClick={() => openLightbox(activeIdx)}
@@ -282,7 +341,6 @@ export default function ProductClient({
               sizes="(max-width: 1024px) 100vw, 520px"
             />
 
-            {/* ✅ стрелки только если есть > 1 фото */}
             {gallery.length > 1 && (
               <>
                 <button
@@ -323,7 +381,6 @@ export default function ProductClient({
               </>
             )}
 
-            {/* кнопка maximize — тоже открывает текущий activeIdx */}
             <button
               type="button"
               onClick={(e) => {
@@ -343,7 +400,6 @@ export default function ProductClient({
             </button>
           </div>
 
-          {/* ✅ Миниатюры */}
           {showThumbs ? (
             <div className={cn("mt-3 grid gap-2", thumbsCols)}>
               {gallery.map((src, i) => {
@@ -380,6 +436,89 @@ export default function ProductClient({
           <h1 className="text-[28px] font-semibold leading-[1.1] tracking-[-0.02em] text-black">
             {product.title}
           </h1>
+
+          {/* ✅ Варианты (цвет/модификация) */}
+          {variants.length > 0 && (
+            <div className="mt-4">
+              <div className="text-[11px] tracking-[0.18em] uppercase text-black/45">
+                {variantsKind === "color" ? "Цвет" : "Модификация"}
+              </div>
+
+              {variantsKind === "color" ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {variants.map((v) => {
+                    const active = String(v.id) === String(selectedVariantId);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setSelectedVariantId(String(v.id))}
+                        className={cn(
+                          "cursor-pointer inline-flex items-center gap-2 rounded-full border px-3 py-2 text-[12px] font-semibold transition",
+                          active
+                            ? "border-black/25 bg-black/[0.04] text-black"
+                            : "border-black/10 bg-white text-black/70 hover:border-black/20 hover:text-black",
+                        )}
+                        aria-label={`Вариант: ${v.title}`}
+                      >
+                        <span
+                          className={cn(
+                            "h-2.5 w-2.5 rounded-full border",
+                            active
+                              ? "border-black/30 bg-black/30"
+                              : "border-black/20 bg-black/10",
+                          )}
+                        />
+                        {v.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-2 inline-flex overflow-hidden rounded-full border border-black/10 bg-white">
+                  {variants.map((v) => {
+                    const active = String(v.id) === String(selectedVariantId);
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        onClick={() => setSelectedVariantId(String(v.id))}
+                        className={cn(
+                          "cursor-pointer px-4 py-2 text-[12px] font-semibold transition",
+                          active
+                            ? "bg-black text-white"
+                            : "bg-white text-black/70 hover:text-black hover:bg-black/[0.03]",
+                        )}
+                      >
+                        {v.title}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* маленькое подтверждение выбора */}
+              {selectedVariant?.title ? (
+                <div className="mt-2 text-[12px] text-black/55">
+                  Выбрано:{" "}
+                  <span className="font-semibold text-black/75">
+                    {selectedVariant.title}
+                  </span>
+                </div>
+              ) : null}
+
+              {/* наценка */}
+              {variantDelta !== 0 && (
+                <div className="mt-1 text-[12px] text-black/55">
+                  Наценка:{" "}
+                  <span className="font-semibold text-black/75">
+                    {formatPrice(Math.abs(variantDelta), currency)}
+                  </span>{" "}
+                  {variantDelta > 0 ? "↑" : "↓"}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-3 flex items-start justify-between gap-6">
             <div className="text-[28px] font-semibold text-black">
@@ -436,7 +575,7 @@ export default function ProductClient({
 
             <button
               onClick={() => {
-                shop.setOneClick(product.id, qty);
+                shop.setOneClick(product.id, qty, selectedVariantId);
                 router.push("/checkout?mode=oneclick");
               }}
               className={cn(
@@ -450,7 +589,6 @@ export default function ProductClient({
             </button>
           </div>
 
-          {/* ✅ Блок “Коллекция” — СКРЫВАЕМ на витрине */}
           {showCollectionCard && (
             <Link
               href={product.collectionHref!}
@@ -558,7 +696,7 @@ export default function ProductClient({
         <div className="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {(product.related ?? []).slice(0, 4).map((p) => {
             const v = currency === "RUB" ? p.price_rub : p.price_uzs;
-            const relInCart = isInCart(p.id);
+            const relInCart = isInCart(p.id); // related — base
 
             return (
               <Link key={p.id} href={p.href} className="group block">

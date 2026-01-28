@@ -1,3 +1,4 @@
+// app/checkout/CheckoutClient.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -50,12 +51,19 @@ function safeParse<T>(raw: string | null, fallback: T): T {
   }
 }
 
+type VariantAny = {
+  id: string;
+  title?: string;
+  priceDeltaRUB?: number;
+  priceDeltaUZS?: number;
+};
+
 export default function CheckoutClient() {
   const sp = useSearchParams();
   const mode = sp.get("mode"); // "oneclick" | null
 
   const { region } = useRegionLang();
-  const shop = useShopState() as any;
+  const shop = useShopState();
 
   const [phone, setPhone] = useState(region === "uz" ? "+998 " : "+7 ");
   const [name, setName] = useState("");
@@ -109,13 +117,13 @@ export default function CheckoutClient() {
   }, []);
 
   // ===== items source =====
-  const cart = shop?.cart ?? {};
-  const cartIds = useMemo(
-    () => Object.keys(cart).filter((id) => (cart[id] ?? 0) > 0),
+  const cart = shop.cart ?? {};
+  const cartKeys = useMemo(
+    () => Object.keys(cart).filter((k) => (cart[k] ?? 0) > 0),
     [cart],
   );
 
-  const oneClick = shop?.oneClick ?? null;
+  const oneClick = shop.oneClick ?? null;
 
   const oneClickFromLS = useMemo(() => {
     if (typeof window === "undefined") return null;
@@ -136,43 +144,69 @@ export default function CheckoutClient() {
   const items = useMemo(() => {
     const useOneClick = mode === "oneclick";
 
-    const ids = useOneClick
+    const keys = useOneClick
       ? effectiveOneClick?.id
         ? [effectiveOneClick.id]
         : []
-      : cartIds;
+      : cartKeys;
 
-    return ids
-      .map((id) => {
-        const key = String(id);
+    return keys
+      .map((key) => {
+        const k = String(key);
 
-        const p = CATALOG_BY_ID.get(key);
+        // ✅ используем parseKey из shop-state (единая логика)
+        const { productId, variantId } = shop.parseKey(k);
+
+        const p = CATALOG_BY_ID.get(String(productId));
         if (!p) return null;
 
         const qty = useOneClick
           ? (effectiveOneClick?.qty ?? 1)
-          : (cart[key] ?? 1);
+          : (cart[k] ?? 1);
 
-        const unit =
+        const baseUnit =
           region === "uz" ? (p as any).price_uzs : (p as any).price_rub;
 
+        const variants: VariantAny[] = Array.isArray((p as any).variants)
+          ? ((p as any).variants as VariantAny[])
+          : [];
+
+        const variant =
+          variantId && variantId !== "base"
+            ? (variants.find((v) => String(v.id) === String(variantId)) ?? null)
+            : null;
+
+        const delta =
+          region === "uz"
+            ? Number(variant?.priceDeltaUZS ?? 0) || 0
+            : Number(variant?.priceDeltaRUB ?? 0) || 0;
+
+        const unit = Number(baseUnit || 0) + Number(delta || 0);
+
+        const variantTitle = variant?.title ? String(variant.title) : null;
+
         return {
-          id: key,
-          title: (p as any).title,
+          key: k,
+          productId: String(productId),
+          variantId: String(variantId),
+          variantTitle,
+          title: String((p as any).title ?? ""),
           qty,
           unit,
           sum: unit * qty,
         };
       })
-
       .filter(Boolean) as Array<{
-      id: string;
+      key: string;
+      productId: string;
+      variantId: string;
+      variantTitle: string | null;
       title: string;
       qty: number;
       unit: number;
       sum: number;
     }>;
-  }, [mode, effectiveOneClick, cartIds, cart, region]);
+  }, [mode, effectiveOneClick, cartKeys, cart, region, shop]);
 
   const total = useMemo(() => items.reduce((a, b) => a + b.sum, 0), [items]);
 
@@ -204,8 +238,17 @@ export default function CheckoutClient() {
           address: address.trim() || undefined,
           comment: comment.trim() || undefined,
         },
-        items,
+        items: items.map((it) => ({
+          id: it.productId,
+          variantId: it.variantId,
+          variantTitle: it.variantTitle || undefined,
+          qty: it.qty,
+          unit: it.unit,
+          sum: it.sum,
+          title: it.title,
+        })),
         total,
+        meta: { mode: mode === "oneclick" ? "oneclick" : "cart" },
       };
 
       const res = await fetch("/api/order", {
@@ -221,10 +264,10 @@ export default function CheckoutClient() {
 
       setDoneOrderId(orderId);
 
-      if (mode === "oneclick" && typeof shop?.clearOneClick === "function") {
-        shop.clearOneClick();
-      } else if (typeof shop?.clearCart === "function") {
-        shop.clearCart();
+      if (mode === "oneclick") {
+        shop.clearOneClick?.();
+      } else {
+        shop.clearCart?.();
       }
     } catch (e: any) {
       setError(e?.message || "Ошибка");
@@ -351,17 +394,28 @@ export default function CheckoutClient() {
             {items.length ? (
               items.map((it) => (
                 <div
-                  key={it.id}
+                  key={it.key}
                   className="flex items-start justify-between gap-3"
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">
                       {it.title}
                     </div>
+
+                    {it.variantTitle && it.variantId !== "base" && (
+                      <div className="mt-1 text-[12px] text-black/55">
+                        Вариант:{" "}
+                        <span className="font-semibold text-black/75">
+                          {it.variantTitle}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="mt-1 text-xs text-black/45">
                       {it.qty} × {formatMoney(it.unit, region)}
                     </div>
                   </div>
+
                   <div className="text-sm font-semibold">
                     {formatMoney(it.sum, region)}
                   </div>

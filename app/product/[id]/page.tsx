@@ -14,12 +14,37 @@ export default async function ProductPage({
   const p = (CATALOG_MOCK as any[]).find((x) => String(x.id) === String(id));
   if (!p) return notFound();
 
-  // ✅ нормализуем под UI 1-в-1
-  const gallery = (
+  // ✅ нормализуем галерею (база)
+  const galleryBase = (
     Array.isArray(p.gallery) && p.gallery.length
       ? p.gallery
       : [p.image, p.image, p.image, p.image]
-  ).map(String);
+  )
+    .map(String)
+    .filter(Boolean);
+
+  // ✅ нормализуем variants (если есть)
+  const variants = Array.isArray(p.variants)
+    ? (p.variants as any[])
+        .map((v) => ({
+          id: String(v?.id ?? ""),
+          title: String(v?.title ?? ""),
+          kind: v?.kind === "color" || v?.kind === "option" ? v.kind : "option",
+          priceDeltaRUB:
+            v?.priceDeltaRUB !== undefined
+              ? Number(v.priceDeltaRUB)
+              : undefined,
+          priceDeltaUZS:
+            v?.priceDeltaUZS !== undefined
+              ? Number(v.priceDeltaUZS)
+              : undefined,
+          image: v?.image ? String(v.image) : undefined,
+          gallery: Array.isArray(v?.gallery)
+            ? v.gallery.map(String).filter(Boolean)
+            : undefined,
+        }))
+        .filter((v) => v.id && v.title)
+    : [];
 
   const product = {
     id: String(p.id),
@@ -27,10 +52,13 @@ export default async function ProductPage({
     badge: p.badge || "",
     href: p.href || `/product/${p.id}`,
     sku: p.sku || `T${String(p.id).padStart(4, "0")}`, // как "T0662"
-    image: p.image,
-    gallery,
+    image: String(p.image || ""),
+    gallery: galleryBase,
     price_rub: Number(p.price_rub ?? 0),
     price_uzs: Number(p.price_uzs ?? 0),
+
+    // ✅ ВАЖНО: прокидываем варианты
+    variants, // <-- ВОТ ЭТОГО НЕ ХВАТАЛО
 
     // Блок "Описание"
     description:

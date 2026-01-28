@@ -1,3 +1,4 @@
+// app/cart/CartClient.tsx
 "use client";
 
 import React, { useMemo } from "react";
@@ -17,9 +18,7 @@ function formatMoney(n: number, region: "uz" | "ru") {
   return new Intl.NumberFormat("ru-RU").format(n) + " ₽";
 }
 
-/**
- * ✅ Безопасная картинка: если src битый — показываем плейсхолдер
- */
+/** ✅ Безопасная картинка: если src битый — показываем плейсхолдер */
 function SafeImage({ src, alt }: { src: string; alt: string }) {
   const [broken, setBroken] = React.useState(false);
 
@@ -45,56 +44,101 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
+type VariantAny = {
+  id: string;
+  title?: string;
+  priceDeltaRUB?: number;
+  priceDeltaUZS?: number;
+  image?: string;
+};
+
 export default function CartClient() {
   const { region } = useRegionLang(); // "uz" | "ru"
-  const shop = useShopState(); // ✅ уже типизированный
+  const shop = useShopState();
 
-  const ids = useMemo(() => {
-    return Object.keys(shop.cart).filter((id) => (shop.cart[id] ?? 0) > 0);
+  // ✅ keys в cart уже вида productId::variantId
+  const keys = useMemo(() => {
+    return Object.keys(shop.cart).filter((k) => (shop.cart[k] ?? 0) > 0);
   }, [shop.cart]);
 
   const items = useMemo(() => {
-    return ids
-      .map((id) => {
-        const p = CATALOG_BY_ID.get(id);
+    return keys
+      .map((key) => {
+        const { productId, variantId } = shop.parseKey(key);
+
+        const p = CATALOG_BY_ID.get(String(productId));
         if (!p) return null;
 
-        const qty = shop.cart[id] ?? 1;
-        const unit = region === "uz" ? p.price_uzs : p.price_rub;
+        const qty = shop.cart[key] ?? 1;
+
+        const baseUnitRaw =
+          region === "uz" ? (p as any).price_uzs : (p as any).price_rub;
+
+        // ✅ защита от строк/undefined
+        const baseUnit = Number(baseUnitRaw ?? 0) || 0;
+
+        const variants: VariantAny[] = Array.isArray((p as any).variants)
+          ? ((p as any).variants as VariantAny[])
+          : [];
+
+        const variant =
+          variantId && variantId !== "base"
+            ? (variants.find((v) => String(v.id) === String(variantId)) ?? null)
+            : null;
+
+        const deltaRaw =
+          region === "uz"
+            ? Number(variant?.priceDeltaUZS ?? 0)
+            : Number(variant?.priceDeltaRUB ?? 0);
+
+        const delta = Number(deltaRaw ?? 0) || 0;
+
+        const unit = baseUnit + delta;
+        const variantTitle = variant?.title ? String(variant.title) : null;
+
+        const image =
+          (variant?.image ? String(variant.image) : "") || (p as any).image;
 
         return {
-          id,
+          key,
+          productId: String(productId),
+          variantId: String(variantId),
+          variantTitle,
           product: p,
           qty,
           unit,
           sum: unit * qty,
+          image: String(image || ""),
         };
       })
       .filter(Boolean) as Array<{
-      id: string;
+      key: string;
+      productId: string;
+      variantId: string;
+      variantTitle: string | null;
       product: (typeof CATALOG_MOCK)[number];
       qty: number;
       unit: number;
       sum: number;
+      image: string;
     }>;
-  }, [ids, shop.cart, region]);
+  }, [keys, shop.cart, shop, region]);
 
   const total = useMemo(
     () => items.reduce((acc, it) => acc + it.sum, 0),
     [items],
   );
 
-  const remove = (id: string) => {
-    shop.removeFromCart(id);
+  const remove = (productId: string, variantId: string) => {
+    shop.removeFromCart(productId, variantId);
   };
 
   const clear = () => {
     shop.clearCart();
   };
 
-  const changeQty = (id: string, nextQty: number) => {
-    // твой setCartQty уже сам удаляет если qty <= 0
-    shop.setCartQty(id, nextQty);
+  const changeQty = (productId: string, variantId: string, nextQty: number) => {
+    shop.setCartQty(productId, nextQty, variantId);
   };
 
   return (
@@ -154,33 +198,43 @@ export default function CartClient() {
           ) : (
             items.map((it) => (
               <div
-                key={it.id}
+                key={it.key}
                 className="rounded-3xl border border-black/10 bg-white p-4 md:p-5"
               >
                 <div className="flex gap-4">
                   <Link
-                    href={`/catalog?product=${it.product.id}`}
+                    href={`/product/${it.productId}`}
                     className="cursor-pointer relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-black/5"
                   >
-                    <SafeImage src={it.product.image} alt={it.product.title} />
+                    <SafeImage src={it.image} alt={it.product.title} />
                   </Link>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <Link
-                          href={`/catalog?product=${it.product.id}`}
+                          href={`/product/${it.productId}`}
                           className="cursor-pointer block truncate text-base font-medium tracking-[-0.01em] hover:underline"
                         >
                           {it.product.title}
                         </Link>
+
+                        {it.variantTitle && it.variantId !== "base" ? (
+                          <div className="mt-1 text-[12px] text-black/55">
+                            Вариант:{" "}
+                            <span className="font-semibold text-black/75">
+                              {it.variantTitle}
+                            </span>
+                          </div>
+                        ) : null}
+
                         <div className="mt-1 text-xs text-black/45">
-                          ID: {it.product.id}
+                          ID: {it.productId}
                         </div>
                       </div>
 
                       <button
-                        onClick={() => remove(it.id)}
+                        onClick={() => remove(it.productId, it.variantId)}
                         className="cursor-pointer inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white text-black/65 hover:text-black hover:border-black/20 transition"
                         aria-label="Удалить"
                         title="Удалить"
@@ -194,7 +248,9 @@ export default function CartClient() {
                       <div className="inline-flex items-center rounded-full border border-black/10 bg-white p-1">
                         <button
                           className="cursor-pointer h-9 w-9 rounded-full text-black/70 hover:text-black transition"
-                          onClick={() => changeQty(it.id, it.qty - 1)}
+                          onClick={() =>
+                            changeQty(it.productId, it.variantId, it.qty - 1)
+                          }
                         >
                           −
                         </button>
@@ -203,7 +259,9 @@ export default function CartClient() {
                         </div>
                         <button
                           className="cursor-pointer h-9 w-9 rounded-full text-black/70 hover:text-black transition"
-                          onClick={() => changeQty(it.id, it.qty + 1)}
+                          onClick={() =>
+                            changeQty(it.productId, it.variantId, it.qty + 1)
+                          }
                         >
                           +
                         </button>
