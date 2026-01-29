@@ -1,5 +1,5 @@
 // app/lib/mock/products.ts
-import { CATALOG_MOCK } from "./catalog-products";
+import { BRANDS, CATALOG_MOCK } from "./catalog-products";
 
 export type ProductMock = {
   id: string;
@@ -8,6 +8,11 @@ export type ProductMock = {
   image: string;
   sku?: string;
   badge?: string;
+
+  // ✅ добавили коллекцию
+  brand?: string; // slug: "scandi"
+  collectionLabel?: string; // "SCANDI"
+
   price: {
     rub: number;
     uzs: number;
@@ -17,16 +22,26 @@ export type ProductMock = {
 export const PRODUCTS_MOCK: ProductMock[] = (CATALOG_MOCK as any[]).map((p) => {
   const id = String(p.id);
 
+  const brandSlug = String(p.brand ?? "").trim().toLowerCase();
+  const collectionLabel =
+    BRANDS.find((b) => String(b.slug).toLowerCase() === brandSlug)?.title ??
+    (brandSlug ? brandSlug.toUpperCase() : "");
+
   return {
     id,
     title: String(p.title ?? ""),
     href: String(p.href ?? `/catalog?product=${id}`),
     image: String(p.image ?? ""),
-    sku: p.sku ? String(p.sku) : (p.skuLabel ? String(p.skuLabel) : undefined),
+    sku: p.sku ? String(p.sku) : p.skuLabel ? String(p.skuLabel) : undefined,
     badge: p.badge ? String(p.badge) : undefined,
+
+    // ✅ коллекция
+    brand: brandSlug || undefined,
+    collectionLabel: collectionLabel || undefined,
+
     price: {
-      rub: Number(p.price_rub ?? 0),
-      uzs: Number(p.price_uzs ?? 0),
+      rub: Number(p.price_rub ?? p.priceRUB ?? 0),
+      uzs: Number(p.price_uzs ?? p.priceUZS ?? 0),
     },
   };
 });

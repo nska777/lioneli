@@ -8,7 +8,11 @@ import { Trash2, ArrowRight, ShoppingBag } from "lucide-react";
 
 import { useRegionLang } from "../context/region-lang";
 import { useShopState } from "../context/shop-state";
-import { CATALOG_BY_ID, CATALOG_MOCK } from "../lib/mock/catalog-products";
+import {
+  CATALOG_BY_ID,
+  CATALOG_MOCK,
+  BRANDS,
+} from "../lib/mock/catalog-products";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -16,6 +20,16 @@ const cn = (...s: Array<string | false | null | undefined>) =>
 function formatMoney(n: number, region: "uz" | "ru") {
   if (region === "uz") return new Intl.NumberFormat("ru-RU").format(n) + " сум";
   return new Intl.NumberFormat("ru-RU").format(n) + " ₽";
+}
+
+/** ✅ Лейбл коллекции по slug (brand) */
+function labelByBrandSlug(slug: string | null | undefined) {
+  const s = String(slug ?? "")
+    .trim()
+    .toLowerCase();
+  if (!s) return null;
+  const found = BRANDS.find((b) => String(b.slug).toLowerCase() === s);
+  return found ? found.title : s.toUpperCase();
 }
 
 /** ✅ Безопасная картинка: если src битый — показываем плейсхолдер */
@@ -99,6 +113,10 @@ export default function CartClient() {
         const image =
           (variant?.image ? String(variant.image) : "") || (p as any).image;
 
+        // ✅ коллекция (brand)
+        const brandSlug = String((p as any).brand ?? "");
+        const collectionLabel = labelByBrandSlug(brandSlug);
+
         return {
           key,
           productId: String(productId),
@@ -109,6 +127,7 @@ export default function CartClient() {
           unit,
           sum: unit * qty,
           image: String(image || ""),
+          collectionLabel,
         };
       })
       .filter(Boolean) as Array<{
@@ -121,6 +140,7 @@ export default function CartClient() {
       unit: number;
       sum: number;
       image: string;
+      collectionLabel: string | null;
     }>;
   }, [keys, shop.cart, shop, region]);
 
@@ -216,6 +236,11 @@ export default function CartClient() {
                           href={`/product/${it.productId}`}
                           className="cursor-pointer block truncate text-base font-medium tracking-[-0.01em] hover:underline"
                         >
+                          {it.collectionLabel ? (
+                            <span className="text-black/55">
+                              {it.collectionLabel} /{" "}
+                            </span>
+                          ) : null}
                           {it.product.title}
                         </Link>
 

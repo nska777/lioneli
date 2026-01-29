@@ -15,6 +15,20 @@ export type CatalogVariant = {
   gallery?: string[];
 };
 
+// ✅ Атрибуты для фильтрации (без ломания старого UI)
+export type CatalogAttrs = {
+  // шкафы
+  doors?: 1 | 2 | 3 | 4;
+  facade?:
+    | "blind"
+    | "mirror"
+    | "combined"
+    | "mirror-combined";
+
+  // на будущее — любые доп. атрибуты
+  [k: string]: string | number | boolean | undefined;
+};
+
 export type CatalogProduct = {
   id: string;
   title: string;
@@ -43,6 +57,9 @@ export type CatalogProduct = {
   // варианты
   variants?: CatalogVariant[];
 
+  // ✅ новые атрибуты
+  attrs?: CatalogAttrs;
+
   // совместимость со старым snake_case
   price_rub?: number;
   price_uzs?: number;
@@ -51,11 +68,17 @@ export type CatalogProduct = {
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export function makeGallery(basePath: string, count: number) {
-  return Array.from({ length: count }, (_, i) => `${basePath}/${pad2(i + 1)}.jpg`);
+  return Array.from(
+    { length: count },
+    (_, i) => `${basePath}/${pad2(i + 1)}.jpg`,
+  );
 }
 
 export function makeProduct(
-  p: Omit<CatalogProduct, "image" | "price_rub" | "price_uzs" | "category"> & {
+  p: Omit<
+    CatalogProduct,
+    "image" | "price_rub" | "price_uzs" | "category"
+  > & {
     basePath: string;
     coverIndex?: number;
     collectionKey?: string;
@@ -86,6 +109,9 @@ export function makeProduct(
     priceRUB,
     priceUZS,
     variants: Array.isArray(p.variants) ? p.variants : undefined,
+
+    // ✅ attrs
+    attrs: (p as any).attrs,
 
     // ✅ совместимость
     price_rub: priceRUB,

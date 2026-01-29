@@ -1,4 +1,3 @@
-// app/checkout/CheckoutClient.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -8,7 +7,7 @@ import { ArrowRight, CheckCircle2 } from "lucide-react";
 
 import { useRegionLang } from "../context/region-lang";
 import { useShopState } from "../context/shop-state";
-import { CATALOG_BY_ID } from "@/app/lib/mock/catalog-products";
+import { CATALOG_BY_ID, BRANDS } from "@/app/lib/mock/catalog-products";
 
 import { supabase } from "@/app/lib/supabase/client";
 
@@ -57,6 +56,15 @@ type VariantAny = {
   priceDeltaRUB?: number;
   priceDeltaUZS?: number;
 };
+
+function labelByBrandSlug(slug: string | null | undefined) {
+  const s = String(slug ?? "")
+    .trim()
+    .toLowerCase();
+  if (!s) return null;
+  const found = BRANDS.find((b) => String(b.slug).toLowerCase() === s);
+  return found ? found.title : s.toUpperCase();
+}
 
 export default function CheckoutClient() {
   const sp = useSearchParams();
@@ -182,8 +190,11 @@ export default function CheckoutClient() {
             : Number(variant?.priceDeltaRUB ?? 0) || 0;
 
         const unit = Number(baseUnit || 0) + Number(delta || 0);
-
         const variantTitle = variant?.title ? String(variant.title) : null;
+
+        // ✅ коллекция
+        const brandSlug = String((p as any).brand ?? "");
+        const collectionLabel = labelByBrandSlug(brandSlug);
 
         return {
           key: k,
@@ -191,6 +202,8 @@ export default function CheckoutClient() {
           variantId: String(variantId),
           variantTitle,
           title: String((p as any).title ?? ""),
+          collectionSlug: brandSlug || null,
+          collectionLabel,
           qty,
           unit,
           sum: unit * qty,
@@ -202,6 +215,8 @@ export default function CheckoutClient() {
       variantId: string;
       variantTitle: string | null;
       title: string;
+      collectionSlug: string | null;
+      collectionLabel: string | null;
       qty: number;
       unit: number;
       sum: number;
@@ -232,6 +247,10 @@ export default function CheckoutClient() {
         orderId,
         createdAt: new Date().toLocaleString("ru-RU"),
         region,
+
+        // ✅ ВАЖНО: теперь API точно поймёт тип заказа
+        mode: mode === "oneclick" ? "oneclick" : "cart",
+
         customer: {
           phone: phone.trim(),
           name: name.trim() || undefined,
@@ -240,6 +259,11 @@ export default function CheckoutClient() {
         },
         items: items.map((it) => ({
           id: it.productId,
+
+          // ✅ коллекция — для TG / админов
+          collection: it.collectionSlug || undefined,
+          collectionLabel: it.collectionLabel || undefined,
+
           variantId: it.variantId,
           variantTitle: it.variantTitle || undefined,
           qty: it.qty,
@@ -248,6 +272,8 @@ export default function CheckoutClient() {
           title: it.title,
         })),
         total,
+
+        // оставим как было, чтобы ничего не сломать у тебя в будущем
         meta: { mode: mode === "oneclick" ? "oneclick" : "cart" },
       };
 
@@ -398,7 +424,13 @@ export default function CheckoutClient() {
                   className="flex items-start justify-between gap-3"
                 >
                   <div className="min-w-0">
+                    {/* ✅ коллекция + название */}
                     <div className="truncate text-sm font-medium">
+                      {it.collectionLabel ? (
+                        <span className="text-black/55">
+                          {it.collectionLabel} /{" "}
+                        </span>
+                      ) : null}
                       {it.title}
                     </div>
 

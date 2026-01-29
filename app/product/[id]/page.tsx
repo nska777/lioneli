@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import ProductClient from "./ui/ProductClient";
 
 // ✅ единый источник правды (моки каталога)
-import { CATALOG_MOCK } from "@/app/lib/mock/catalog-products";
+import { BRANDS, CATALOG_MOCK } from "@/app/lib/mock/catalog-products";
 
 export default async function ProductPage({
   params,
@@ -46,6 +46,14 @@ export default async function ProductPage({
         .filter((v) => v.id && v.title)
     : [];
 
+  // ✅ коллекция (бренд)
+  const brandSlug = String(p.brand ?? "")
+    .trim()
+    .toLowerCase();
+  const brandLabel =
+    BRANDS.find((b) => String(b.slug).toLowerCase() === brandSlug)?.title ??
+    (brandSlug ? brandSlug.toUpperCase() : "");
+
   const product = {
     id: String(p.id),
     title: p.title,
@@ -54,16 +62,20 @@ export default async function ProductPage({
     sku: p.sku || `T${String(p.id).padStart(4, "0")}`, // как "T0662"
     image: String(p.image || ""),
     gallery: galleryBase,
-    price_rub: Number(p.price_rub ?? 0),
-    price_uzs: Number(p.price_uzs ?? 0),
+    price_rub: Number(p.price_rub ?? p.priceRUB ?? 0),
+    price_uzs: Number(p.price_uzs ?? p.priceUZS ?? 0),
 
     // ✅ ВАЖНО: прокидываем варианты
-    variants, // <-- ВОТ ЭТОГО НЕ ХВАТАЛО
+    variants,
+
+    // ✅ ВАЖНО: прокидываем коллекцию (чтобы в UI писать SCANDI)
+    brand: brandSlug, // "scandi"
+    collectionLabel: brandLabel, // "SCANDI"
 
     // Блок "Описание"
     description:
       p.description ||
-      "Компактная и практичная модель. Удобная тумба с выдвижными ящиками. Для изготовления используются качественные материалы. Компактная и практичная модель. Удобная тумба с выдвижными ящиками. Для изготовления используются качественные материалы. Компактная и практичная модель. Удобная тумба с выдвижными ящиками. Для изготовления используются качественные материалы. Компактная и практичная модель. Удобная тумба с выдвижными ящиками. Для изготовления используются качественные материалы. Компактная и практичная модель. Удобная тумба с выдвижными ящиками. Для изготовления используются качественные материалы. Компактная и практичная модель. Удобная тумба с выдвижными ящиками. Для изготовления используются качественные материалы.",
+      "Компактная и практичная модель. Удобная тумба с выдвижными ящиками. Для изготовления используются качественные материалы.",
 
     // Блок "Дополнительная информация"
     extra: {
@@ -81,8 +93,8 @@ export default async function ProductPage({
         id: String(x.id),
         title: x.title,
         image: x.image,
-        price_rub: Number(x.price_rub ?? 0),
-        price_uzs: Number(x.price_uzs ?? 0),
+        price_rub: Number(x.price_rub ?? x.priceRUB ?? 0),
+        price_uzs: Number(x.price_uzs ?? x.priceUZS ?? 0),
         href: `/product/${x.id}`,
         badge: x.badge || "",
       })),

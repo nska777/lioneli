@@ -1,18 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+
 import gsap from "gsap";
-import { X } from "lucide-react";
 
 import { useRegionLang } from "@/app/context/region-lang";
+import { BRANDS, CATALOG_MOCK as MOCK } from "@/app/lib/mock/catalog-products";
 
 import FiltersSidebar, { FiltersMeta, FiltersValue } from "./FiltersSidebar";
-import ProductActions from "../ProductActions";
-
-import { BRANDS, CATALOG_MOCK as MOCK } from "@/app/lib/mock/catalog-products";
+import CatalogTopFilters from "./CatalogTopFilters";
+import CatalogToolbar from "./CatalogToolbar";
+import CatalogGrid from "./CatalogGrid";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
@@ -32,15 +31,6 @@ function setCSV(params: URLSearchParams, key: string, arr: string[]) {
 
 type SortKey = "default" | "title_asc" | "price_asc" | "price_desc";
 
-/**
- * ✅ ТОП "РАЗДЕЛ" (как ты просишь)
- * ВАЖНО: value должен совпадать с тем, что реально лежит в товаре
- * (menu / room / category / section ...)
- *
- * Сейчас в твоих моках (catalog-products.ts) есть brand + cat.
- * Поэтому эти кнопки будут работать ТОЛЬКО если у товара реально есть поле room/menu.
- * (Я оставил универсальный getter — если поля нет, фильтр не будет отсеивать.)
- */
 const ROOM_ITEMS = [
   { label: "Спальни", value: "bedrooms" },
   { label: "Гостиные", value: "living" },
@@ -49,11 +39,6 @@ const ROOM_ITEMS = [
   { label: "Столы и стулья", value: "tables_chairs" },
 ];
 
-/**
- * ✅ Модули
- * Для твоих моков логично считать, что module = cat (komody/krovati/...)
- * Но я оставил фолбэки, чтобы не ломать другие товары.
- */
 const MODULE_ITEMS = [
   { label: "Комоды", value: "komody" },
   { label: "Тумбы", value: "tumby" },
@@ -75,7 +60,6 @@ const MODULE_ITEMS = [
 type ProductAny = (typeof MOCK)[number] & Record<string, any>;
 
 function getRoomSlug(p: ProductAny) {
-  // если room/menu нет — возвращаем пусто, и фильтр "Раздел" не будет вырезать товары
   return String(
     p.menu ?? p.room ?? p.section ?? p.category ?? p.room_slug ?? "",
   )
@@ -90,11 +74,32 @@ function getCollectionSlug(p: ProductAny) {
 }
 
 function getModuleSlug(p: ProductAny) {
-  // ✅ если нет type/module — берём cat (твой текущий мок)
   return String(p.type ?? p.module ?? p.kind ?? p.cat ?? p.item_type ?? "")
     .trim()
     .toLowerCase();
 }
+
+// ✅ Подфильтры (созданы под шкафы, расширяем под витрины)
+const DOOR_ITEMS = [
+  { label: "1", value: "1" },
+  { label: "2", value: "2" },
+  { label: "3", value: "3" },
+  { label: "4", value: "4" },
+];
+
+const FACADE_ITEMS: Array<{ label: string; value: string }> = [
+  { label: "Глухой", value: "blind" },
+  { label: "Зеркальный", value: "mirror" },
+  { label: "Комбинированный", value: "combined" },
+  { label: "Зеркально-комбинир.", value: "mirror-combined" },
+];
+
+// ✅ Витрины — “вид”
+const VITRINI_FACADE_ITEMS: Array<{ label: string; value: string }> = [
+  { label: "Обычная", value: "blind" },
+  { label: "Со стеклом", value: "glass" },
+  { label: "Со стеклом и полками", value: "glass-shelves" },
+];
 
 export default function CatalogClient({
   initialBrand,
@@ -115,7 +120,6 @@ export default function CatalogClient({
       ? `${uzs.toLocaleString("en-US")} сум`
       : `${rub.toLocaleString("en-US")} руб.`;
 
-  // ✅ единый геттер цены + фолбэки (priceUZS/priceRUB и snake_case тоже)
   const priceOf = (p: ProductAny) => {
     if (region === "uz") {
       const v = p.price_uzs ?? p.priceUZS ?? p.priceUz ?? p.uzs ?? 0;
@@ -132,6 +136,13 @@ export default function CatalogClient({
     router.push(qs ? `/catalog?${qs}` : "/catalog", { scroll: false });
   }
 
+  function setSingleParam(key: string, val: string) {
+    pushParams((params) => {
+      if (!val) params.delete(key);
+      else params.set(key, val);
+    });
+  }
+
   function setSingleCSVParam(
     key: "menu" | "collections" | "types",
     val: string,
@@ -139,6 +150,15 @@ export default function CatalogClient({
     pushParams((params) => {
       if (!val) params.delete(key);
       else params.set(key, val);
+
+      // ✅ если ушли с "Шкафы" или "Витрины" — подфильтры сбрасываем
+      if (key === "types") {
+        const next = (val || "").toLowerCase();
+        if (next !== "shkafy" && next !== "vitrini") {
+          params.delete("doors");
+          params.delete("facade");
+        }
+      }
     });
   }
 
@@ -146,7 +166,6 @@ export default function CatalogClient({
     const n = parseCSV(sp.get("menu"));
     if (n.length) return n;
 
-    // backward compat
     const old = (sp.get("category") || initialCategory || "").toLowerCase();
     return old ? [old] : [];
   }, [sp, initialCategory]);
@@ -155,14 +174,16 @@ export default function CatalogClient({
     const n = parseCSV(sp.get("collections"));
     if (n.length) return n;
 
-    // backward compat
     const old = (sp.get("brand") || initialBrand || "").toLowerCase();
     return old ? [old] : [];
   }, [sp, initialBrand]);
 
   const selectedTypes = useMemo(() => parseCSV(sp.get("types")), [sp]);
 
-  // ✅ absMin/absMax: hook-order safe
+  // ✅ Подфильтры doors/facade из URL
+  const selectedDoors = useMemo(() => parseCSV(sp.get("doors")), [sp]);
+  const selectedFacades = useMemo(() => parseCSV(sp.get("facade")), [sp]);
+
   const absMin = useMemo(() => {
     if (region === "uz") return 0;
 
@@ -191,7 +212,6 @@ export default function CatalogClient({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [region]);
 
-  // ✅ ключевой фикс: если max нет / max=0 → показываем ВСЕ товары
   const rawMin = sp.get("min");
   const rawMax = sp.get("max");
 
@@ -236,6 +256,14 @@ export default function CatalogClient({
       setCSV(params, "collections", next.collections);
       setCSV(params, "types", next.types);
 
+      // ✅ если НЕ выбраны "Шкафы" И НЕ выбраны "Витрины" — чистим подфильтры
+      const hasDoorFacadeCats =
+        next.types.includes("shkafy") || next.types.includes("vitrini");
+      if (!hasDoorFacadeCats) {
+        params.delete("doors");
+        params.delete("facade");
+      }
+
       params.set("min", String(next.priceMin));
       params.set("max", String(next.priceMax));
     });
@@ -245,23 +273,15 @@ export default function CatalogClient({
     router.push("/catalog", { scroll: false });
   }
 
-  // --- search + sort from URL
   const qFromUrl = (sp.get("q") || "").trim();
   const sort = ((sp.get("sort") || "default") as SortKey) || "default";
-
-  // ✅ input-state
   const [q, setQ] = useState(qFromUrl);
 
-  // ✅ если URL поменялся (назад/вперёд) — синхронизируем инпут
-  useEffect(() => {
-    setQ(qFromUrl);
-  }, [qFromUrl]);
+  useEffect(() => setQ(qFromUrl), [qFromUrl]);
 
-  // ✅ LIVE SEARCH: пишешь → через 250мс обновляет URL
   useEffect(() => {
     const t = window.setTimeout(() => {
       const clean = q.trim();
-      // если в URL уже то же самое — не пушим лишний раз
       if (clean === qFromUrl) return;
 
       pushParams((params) => {
@@ -281,22 +301,37 @@ export default function CatalogClient({
     });
   }
 
-  // --- FILTER
+  const activeRoom = sidebarValue.menu[0] || "";
+  const activeCollection = sidebarValue.collections[0] || "";
+  const activeModule = sidebarValue.types[0] || "";
+
+  const isDoorsFacadeUI =
+    activeModule === "shkafy" || activeModule === "vitrini";
+
+  const activeDoor = selectedDoors[0] || "";
+  const activeFacade = selectedFacades[0] || "";
+
+  const facadeItems =
+    activeModule === "vitrini" ? VITRINI_FACADE_ITEMS : FACADE_ITEMS;
+
   const filtered = useMemo(() => {
     const needle = qFromUrl.toLowerCase();
+
+    const isDoorFacadeFilter =
+      sidebarValue.types.includes("shkafy") ||
+      sidebarValue.types.includes("vitrini");
+
+    const doorsSet = new Set(selectedDoors);
+    const facadeSet = new Set(selectedFacades);
 
     return MOCK.filter((pAny) => {
       const p = pAny as ProductAny;
 
-      // ✅ Разделы (работает только если у товара реально есть room/menu)
       const room = getRoomSlug(p);
       if (sidebarValue.menu.length) {
-        if (!room) {
-          // у товара нет room → не вырезаем (иначе ты потеряешь товары)
-        } else if (!sidebarValue.menu.includes(room)) return false;
+        if (room && !sidebarValue.menu.includes(room)) return false;
       }
 
-      // ✅ Коллекции
       const col = getCollectionSlug(p);
       if (
         sidebarValue.collections.length &&
@@ -304,17 +339,26 @@ export default function CatalogClient({
       )
         return false;
 
-      // ✅ Модули (у тебя = cat)
       const mod = getModuleSlug(p);
       if (sidebarValue.types.length && !sidebarValue.types.includes(mod))
         return false;
 
-      // ✅ Price
+      // ✅ Doors / Facade для шкафов И витрин
+      if (isDoorFacadeFilter && (mod === "shkafy" || mod === "vitrini")) {
+        if (doorsSet.size) {
+          const d = String(p.attrs?.doors ?? "");
+          if (!doorsSet.has(d)) return false;
+        }
+        if (facadeSet.size) {
+          const f = String(p.attrs?.facade ?? "");
+          if (!facadeSet.has(f)) return false;
+        }
+      }
+
       const price = priceOf(p);
       if (price < sidebarValue.priceMin) return false;
       if (price > sidebarValue.priceMax) return false;
 
-      // ✅ Search
       if (needle) {
         const hay = `${p.title ?? ""} ${p.badge ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
@@ -331,9 +375,10 @@ export default function CatalogClient({
     sidebarValue.types.join(","),
     sidebarValue.priceMin,
     sidebarValue.priceMax,
+    selectedDoors.join(","),
+    selectedFacades.join(","),
   ]);
 
-  // --- SORT
   const sorted = useMemo(() => {
     const arr = [...filtered];
     switch (sort) {
@@ -354,7 +399,7 @@ export default function CatalogClient({
     return arr;
   }, [filtered, sort, region]);
 
-  // ✅ reveal
+  // GSAP reveal
   useEffect(() => {
     if (!gridRef.current) return;
     const cards = gridRef.current.querySelectorAll("[data-card]");
@@ -381,11 +426,9 @@ export default function CatalogClient({
     region,
     qFromUrl,
     sort,
+    selectedDoors.join(","),
+    selectedFacades.join(","),
   ]);
-
-  const activeRoom = sidebarValue.menu[0] || "";
-  const activeCollection = sidebarValue.collections[0] || "";
-  const activeModule = sidebarValue.types[0] || "";
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-10">
@@ -419,229 +462,65 @@ export default function CatalogClient({
               params.delete("types");
               params.delete("min");
               params.delete("max");
+              params.delete("doors");
+              params.delete("facade");
             })
           }
           currencyLabel={currencyLabel}
         />
 
         <section>
-          {/* Верхние фильтры */}
-          <div className="mb-4 rounded-2xl border border-black/10 bg-[#F7F5F2] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-            <div className="text-[12px] tracking-[0.18em] uppercase text-black/45">
-              Раздел
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {ROOM_ITEMS.map((c) => {
-                const active = activeRoom === c.value;
-                return (
-                  <button
-                    key={c.value}
-                    onClick={() =>
-                      setSingleCSVParam("menu", active ? "" : c.value)
-                    }
-                    className={cn(
-                      "cursor-pointer rounded-full border px-3 py-1.5 text-[12px] transition",
-                      active
-                        ? "border-black bg-black text-white"
-                        : "border-black/10 bg-white text-black/70 hover:text-black",
-                    )}
-                  >
-                    {c.label}
-                  </button>
-                );
-              })}
-            </div>
+          <CatalogTopFilters
+            roomItems={ROOM_ITEMS}
+            brands={BRANDS}
+            moduleItems={MODULE_ITEMS}
+            activeRoom={activeRoom}
+            activeCollection={activeCollection}
+            activeModule={activeModule}
+            onPickRoom={(v) =>
+              setSingleCSVParam("menu", activeRoom === v ? "" : v)
+            }
+            onPickCollection={(v) =>
+              setSingleCSVParam("collections", activeCollection === v ? "" : v)
+            }
+            onPickModule={(v) =>
+              setSingleCSVParam("types", activeModule === v ? "" : v)
+            }
+            // doors/facade
+            isDoorsFacadeUI={isDoorsFacadeUI}
+            doorsTitle={
+              activeModule === "vitrini"
+                ? "Витрины · Створки"
+                : "Шкафы · Створки"
+            }
+            facadeTitle={
+              activeModule === "vitrini" ? "Витрины · Вид" : "Шкафы · Фасад"
+            }
+            doorItems={DOOR_ITEMS}
+            facadeItems={facadeItems}
+            activeDoor={activeDoor}
+            activeFacade={activeFacade}
+            onPickDoor={(v) =>
+              setSingleParam("doors", activeDoor === v ? "" : v)
+            }
+            onPickFacade={(v) =>
+              setSingleParam("facade", activeFacade === v ? "" : v)
+            }
+            onResetDoorFacade={() =>
+              pushParams((params) => {
+                params.delete("doors");
+                params.delete("facade");
+              })
+            }
+          />
 
-            <div className="mt-6 text-[12px] tracking-[0.18em] uppercase text-black/45">
-              Коллекции
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {BRANDS.map((b) => {
-                const active = activeCollection === b.slug;
-                return (
-                  <button
-                    key={b.slug}
-                    onClick={() =>
-                      setSingleCSVParam("collections", active ? "" : b.slug)
-                    }
-                    className={cn(
-                      "cursor-pointer rounded-full border px-3 py-1.5 text-[12px] transition",
-                      active
-                        ? "border-black bg-black text-white"
-                        : "border-black/10 bg-white text-black/70 hover:text-black",
-                    )}
-                  >
-                    {b.title}
-                  </button>
-                );
-              })}
-            </div>
+          <CatalogToolbar q={q} setQ={setQ} sort={sort} setSort={setSort} />
 
-            <div className="mt-6 text-[12px] tracking-[0.18em] uppercase text-black/45">
-              Модули
-            </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {MODULE_ITEMS.map((m) => {
-                const active = activeModule === m.value;
-                return (
-                  <button
-                    key={m.value}
-                    onClick={() =>
-                      setSingleCSVParam("types", active ? "" : m.value)
-                    }
-                    className={cn(
-                      "cursor-pointer rounded-full border px-3 py-1.5 text-[12px] transition",
-                      active
-                        ? "border-black bg-black text-white"
-                        : "border-black/10 bg-white text-black/70 hover:text-black",
-                    )}
-                  >
-                    {m.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* ✅ Куда добавлять ещё 5 коллекций позже:
-                app/lib/mock/catalog-products.ts -> массив BRANDS (добавляй { title, slug })
-            */}
-          </div>
-
-          {/* Toolbar */}
-          <div className="mb-4 rounded-2xl border border-black/10 bg-[#F7F5F2] p-4 shadow-[0_10px_30px_rgba(0,0,0,0.06)]">
-            <div className="grid gap-3 md:grid-cols-[1fr_260px]">
-              {/* Search */}
-              <div className="relative rounded-2xl border border-black/10 bg-white/80 px-4 py-3 backdrop-blur">
-                <div className="text-[10px] tracking-[0.16em] uppercase text-black/45">
-                  Поиск
-                </div>
-
-                <input
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                  placeholder="Витрина, тумба, шкаф…"
-                  className="mt-1 w-full bg-transparent pr-10 text-[14px] text-black/85 outline-none placeholder:text-black/35"
-                />
-
-                {!!q.trim() && (
-                  <button
-                    type="button"
-                    onClick={() => setQ("")}
-                    className="absolute right-3 top-[30px] grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-white text-black/60 hover:text-black hover:border-black/20 transition cursor-pointer"
-                    aria-label="Очистить поиск"
-                    title="Очистить"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* Sort */}
-              <div className="rounded-2xl border border-black/10 bg-white/80 px-4 py-3 backdrop-blur">
-                <div className="text-[10px] tracking-[0.16em] uppercase text-black/45">
-                  Сортировка
-                </div>
-                <select
-                  value={sort}
-                  onChange={(e) => setSort(e.target.value as SortKey)}
-                  className="mt-1 w-full cursor-pointer bg-transparent text-[14px] text-black/85 outline-none"
-                >
-                  <option value="default">По умолчанию</option>
-                  <option value="title_asc">По алфавиту (A→Я)</option>
-                  <option value="price_asc">Цена (по возрастанию)</option>
-                  <option value="price_desc">Цена (по убыванию)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Cards */}
-          <div
-            ref={gridRef}
-            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-          >
-            {sorted.map((pAny, idx) => {
-              const p = pAny as ProductAny;
-              const href = `/product/${p.id}`;
-
-              const snapshot = {
-                title: p.title,
-                href,
-                imageUrl: p.image,
-                sku: p.sku ? String(p.sku) : null,
-                price_uzs: Number(p.price_uzs ?? p.priceUZS ?? 0),
-                price_rub: Number(p.price_rub ?? p.priceRUB ?? 0),
-              };
-
-              return (
-                <article
-                  key={p.id}
-                  data-card
-                  className="group overflow-hidden rounded-2xl border border-black/10 bg-[#F7F5F2] shadow-[0_10px_30px_rgba(0,0,0,0.06)]"
-                >
-                  <Link href={href} className="block">
-                    <div className="relative aspect-[4/3] overflow-hidden">
-                      <Image
-                        src={p.image}
-                        alt={p.title}
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
-                        className="object-cover transition-transform duration-700 group-hover:scale-[1.05]"
-                        priority={idx < 6}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-black/0 to-black/0" />
-
-                      {p.badge ? (
-                        <div className="absolute left-3 top-3 rounded-full border border-white/30 bg-white/80 px-3 py-1 text-[11px] text-black/70 backdrop-blur">
-                          {p.badge}
-                        </div>
-                      ) : null}
-
-                      <div className="absolute right-3 top-3 z-10 flex translate-y-[-6px] gap-2 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-                        <div
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
-                        >
-                          <ProductActions
-                            id={String(p.id)}
-                            snapshot={snapshot}
-                            onOpenSpecs={() => {
-                              window.location.href = href;
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="p-4">
-                      <div className="text-[14px] font-medium leading-snug text-black/90">
-                        {p.title}
-                      </div>
-
-                      <div className="mt-2 text-[15px] font-semibold text-black">
-                        {fmtPrice(
-                          Number(p.price_rub ?? p.priceRUB ?? 0),
-                          Number(p.price_uzs ?? p.priceUZS ?? 0),
-                        )}
-                      </div>
-
-                      <div
-                        className={cn(
-                          "mt-4 w-full rounded-xl px-4 py-2.5 text-center",
-                          "text-[12px] tracking-[0.16em] uppercase text-white",
-                          "bg-black hover:bg-black/90 transition cursor-pointer",
-                        )}
-                      >
-                        Открыть
-                      </div>
-                    </div>
-                  </Link>
-                </article>
-              );
-            })}
-          </div>
+          <CatalogGrid
+            gridRef={gridRef}
+            items={sorted as any}
+            fmtPrice={fmtPrice}
+          />
 
           {sorted.length === 0 ? (
             <div className="mt-8 rounded-2xl border border-black/10 bg-[#F7F5F2] p-8 text-center text-black/60">

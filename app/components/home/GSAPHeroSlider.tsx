@@ -40,6 +40,27 @@ export default function GSAPHeroSlider({
       href: "/catalog?cat=office",
       image: "/hero/3.jpg",
     },
+    {
+      id: "s4",
+      title: "СПАЛЬНЯ BUONGIORNO",
+      ctaLabel: "В КАТАЛОГ",
+      href: "/catalog?cat=living",
+      image: "/hero/4.jpg",
+    },
+    {
+      id: "s5",
+      title: "ГОСТИННАЯ BUONGIORNO",
+      ctaLabel: "В КАТАЛОГ",
+      href: "/catalog?cat=living",
+      image: "/hero/5.jpg",
+    },
+    {
+      id: "s6",
+      title: "ДЕТСКАЯ ELIZABETH",
+      ctaLabel: "В КАТАЛОГ",
+      href: "/catalog?cat=living",
+      image: "/hero/6.jpg",
+    },
   ] as Slide[],
   autoMs = 5200,
 }: {

@@ -24,7 +24,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Bad JSON" }, { status: 400 });
   }
 
-  const { orderId, createdAt, region, mode, customer, items, total } = body || {};
+  const {
+    orderId,
+    createdAt,
+    region,
+    mode: modeTop,
+    meta,
+    customer,
+    items,
+    total,
+  } = body || {};
+
+  // ✅ совместимость: если mode не передали, берём из meta.mode
+  const mode = modeTop ?? meta?.mode ?? meta?.type ?? null;
+
   if (
     !orderId ||
     !customer?.phone ||
@@ -41,10 +54,19 @@ export async function POST(req: Request) {
   const kind = mode === "oneclick" ? "⚡️ ONE-CLICK" : "🛒 CART";
 
   const lines = items
-    .map(
-      (it: any, i: number) =>
-        `${i + 1}) ${it.title} — ${it.qty} × ${it.unit} = ${it.sum} ${currency}`,
-    )
+    .map((it: any, i: number) => {
+      const collection =
+        it.collectionLabel || it.collection || it.brandLabel || it.brand || "";
+      const collectionPart = collection ? `${collection} / ` : "";
+
+      const variant =
+        it.variantTitle && it.variantId && it.variantId !== "base"
+          ? ` (Вариант: ${it.variantTitle})`
+          : "";
+
+      // ✅ итого по строке
+      return `${i + 1}) ${collectionPart}${it.title}${variant} — ${it.qty} × ${it.unit} = ${it.sum} ${currency}`;
+    })
     .join("\n");
 
   const text =
@@ -55,9 +77,7 @@ export async function POST(req: Request) {
     `📞 <b>Телефон:</b> ${esc(customer.phone)}\n` +
     `${customer.name ? `👤 <b>Имя:</b> ${esc(customer.name)}\n` : ""}` +
     `${customer.address ? `📍 <b>Адрес:</b> ${esc(customer.address)}\n` : ""}` +
-    `${
-      customer.comment ? `💬 <b>Комментарий:</b> ${esc(customer.comment)}\n` : ""
-    }` +
+    `${customer.comment ? `💬 <b>Комментарий:</b> ${esc(customer.comment)}\n` : ""}` +
     `\n<b>Заказ:</b>\n${esc(lines)}\n\n` +
     `💰 <b>Итого:</b> ${esc(String(total))} ${currency}`;
 
