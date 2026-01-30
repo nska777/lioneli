@@ -59,24 +59,70 @@ const MODULE_ITEMS = [
 
 type ProductAny = (typeof MOCK)[number] & Record<string, any>;
 
-function getRoomSlug(p: ProductAny) {
-  return String(
-    p.menu ?? p.room ?? p.section ?? p.category ?? p.room_slug ?? "",
-  )
+function norm(s: string) {
+  return String(s ?? "")
     .trim()
     .toLowerCase();
+}
+
+// ✅ Важно: коллекции могут прилетать как slug ("amber") или как label ("AMBER").
+// Приводим к slug.
+function normalizeCollectionToken(v: string) {
+  const t = norm(v);
+  if (!t) return "";
+
+  // уже slug
+  const bySlug = BRANDS.find((b) => norm(b.slug) === t);
+  if (bySlug) return norm(bySlug.slug);
+
+  // пришёл title ("AMBER") -> slug
+  const byTitle = BRANDS.find((b) => norm(b.title) === t);
+  if (byTitle) return norm(byTitle.slug);
+
+  // fallback
+  return t;
+}
+
+function normalizeModuleToken(v: string) {
+  const t = norm(v);
+  if (!t) return "";
+
+  const byValue = MODULE_ITEMS.find((x) => norm(x.value) === t);
+  if (byValue) return norm(byValue.value);
+
+  // если вдруг передали label
+  const byLabel = MODULE_ITEMS.find((x) => norm(x.label) === t);
+  if (byLabel) return norm(byLabel.value);
+
+  return t;
+}
+
+function normalizeRoomToken(v: string) {
+  const t = norm(v);
+  if (!t) return "";
+
+  const byValue = ROOM_ITEMS.find((x) => norm(x.value) === t);
+  if (byValue) return norm(byValue.value);
+
+  const byLabel = ROOM_ITEMS.find((x) => norm(x.label) === t);
+  if (byLabel) return norm(byLabel.value);
+
+  return t;
+}
+
+function getRoomSlug(p: ProductAny) {
+  return norm(p.menu ?? p.room ?? p.section ?? p.category ?? p.room_slug ?? "");
 }
 
 function getCollectionSlug(p: ProductAny) {
-  return String(p.brand ?? p.collection ?? p.model ?? p.series ?? "")
-    .trim()
-    .toLowerCase();
+  // ✅ нормализуем бренд товара тоже через normalizeCollectionToken
+  return normalizeCollectionToken(
+    p.brand ?? p.collection ?? p.model ?? p.series ?? "",
+  );
 }
 
 function getModuleSlug(p: ProductAny) {
-  return String(p.type ?? p.module ?? p.kind ?? p.cat ?? p.item_type ?? "")
-    .trim()
-    .toLowerCase();
+  return norm(p.type ?? p.module ?? p.kind ?? p.cat ?? p.item_type ?? "");
 }
 
 // ✅ Подфильтры (созданы под шкафы, расширяем под витрины)
@@ -138,8 +184,9 @@ export default function CatalogClient({
 
   function setSingleParam(key: string, val: string) {
     pushParams((params) => {
-      if (!val) params.delete(key);
-      else params.set(key, val);
+      const clean = String(val ?? "").trim();
+      if (!clean) params.delete(key);
+      else params.set(key, clean);
     });
   }
 
@@ -148,12 +195,18 @@ export default function CatalogClient({
     val: string,
   ) {
     pushParams((params) => {
-      if (!val) params.delete(key);
-      else params.set(key, val);
+      let clean = String(val ?? "").trim();
+
+      if (key === "collections") clean = normalizeCollectionToken(clean);
+      if (key === "types") clean = normalizeModuleToken(clean);
+      if (key === "menu") clean = normalizeRoomToken(clean);
+
+      if (!clean) params.delete(key);
+      else params.set(key, clean);
 
       // ✅ если ушли с "Шкафы" или "Витрины" — подфильтры сбрасываем
       if (key === "types") {
-        const next = (val || "").toLowerCase();
+        const next = norm(clean);
         if (next !== "shkafy" && next !== "vitrini") {
           params.delete("doors");
           params.delete("facade");
@@ -163,22 +216,27 @@ export default function CatalogClient({
   }
 
   const selectedMenu = useMemo(() => {
-    const n = parseCSV(sp.get("menu"));
+    const n = parseCSV(sp.get("menu")).map(normalizeRoomToken).filter(Boolean);
     if (n.length) return n;
 
-    const old = (sp.get("category") || initialCategory || "").toLowerCase();
+    const old = normalizeRoomToken(sp.get("category") || initialCategory || "");
     return old ? [old] : [];
   }, [sp, initialCategory]);
 
   const selectedCollections = useMemo(() => {
-    const n = parseCSV(sp.get("collections"));
+    const n = parseCSV(sp.get("collections"))
+      .map(normalizeCollectionToken)
+      .filter(Boolean);
     if (n.length) return n;
 
-    const old = (sp.get("brand") || initialBrand || "").toLowerCase();
+    const old = normalizeCollectionToken(sp.get("brand") || initialBrand || "");
     return old ? [old] : [];
   }, [sp, initialBrand]);
 
-  const selectedTypes = useMemo(() => parseCSV(sp.get("types")), [sp]);
+  const selectedTypes = useMemo(
+    () => parseCSV(sp.get("types")).map(normalizeModuleToken).filter(Boolean),
+    [sp],
+  );
 
   // ✅ Подфильтры doors/facade из URL
   const selectedDoors = useMemo(() => parseCSV(sp.get("doors")), [sp]);
@@ -252,9 +310,17 @@ export default function CatalogClient({
 
   function onSidebarChange(next: FiltersValue) {
     pushParams((params) => {
-      setCSV(params, "menu", next.menu);
-      setCSV(params, "collections", next.collections);
-      setCSV(params, "types", next.types);
+      setCSV(params, "menu", next.menu.map(normalizeRoomToken).filter(Boolean));
+      setCSV(
+        params,
+        "collections",
+        next.collections.map(normalizeCollectionToken).filter(Boolean),
+      );
+      setCSV(
+        params,
+        "types",
+        next.types.map(normalizeModuleToken).filter(Boolean),
+      );
 
       // ✅ если НЕ выбраны "Шкафы" И НЕ выбраны "Витрины" — чистим подфильтры
       const hasDoorFacadeCats =
@@ -336,8 +402,9 @@ export default function CatalogClient({
       if (
         sidebarValue.collections.length &&
         !sidebarValue.collections.includes(col)
-      )
+      ) {
         return false;
+      }
 
       const mod = getModuleSlug(p);
       if (sidebarValue.types.length && !sidebarValue.types.includes(mod))
@@ -404,6 +471,13 @@ export default function CatalogClient({
     if (!gridRef.current) return;
     const cards = gridRef.current.querySelectorAll("[data-card]");
     gsap.killTweensOf(cards);
+
+    // ✅ сброс, чтобы не "залипало" от прошлого рендера
+    cards.forEach((el) => {
+      (el as HTMLElement).style.opacity = "1";
+      (el as HTMLElement).style.transform = "translate3d(0,0,0)";
+      (el as HTMLElement).style.filter = "none";
+    });
 
     gsap.fromTo(
       cards,
@@ -478,13 +552,22 @@ export default function CatalogClient({
             activeCollection={activeCollection}
             activeModule={activeModule}
             onPickRoom={(v) =>
-              setSingleCSVParam("menu", activeRoom === v ? "" : v)
+              setSingleCSVParam(
+                "menu",
+                activeRoom === normalizeRoomToken(v) ? "" : v,
+              )
             }
             onPickCollection={(v) =>
-              setSingleCSVParam("collections", activeCollection === v ? "" : v)
+              setSingleCSVParam(
+                "collections",
+                activeCollection === normalizeCollectionToken(v) ? "" : v,
+              )
             }
             onPickModule={(v) =>
-              setSingleCSVParam("types", activeModule === v ? "" : v)
+              setSingleCSVParam(
+                "types",
+                activeModule === normalizeModuleToken(v) ? "" : v,
+              )
             }
             // doors/facade
             isDoorsFacadeUI={isDoorsFacadeUI}

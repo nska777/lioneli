@@ -35,54 +35,6 @@ export const SALVADOR_PRODUCTS: CatalogProduct[] = [
   // =========================
   // КРОВАТИ — SALVADOR
   // =========================
-
-  // 1 папка: кровать / кровать с матрасом (2 фото)
-  // 2 папка: кровать с основанием / кровать с подъёмным механизмом (2 фото)
-makeProduct({
-  id: "salvador-krovati-bed-mechanism",
-  title: "Кровать с подъёмным механизмом",
-  brand: "salvador",
-  cat: "krovati",
-  basePath: "/products/salvador/krovati/bed-mechanism",
-
-  // базовая галерея (2 фото в папке)
-  gallery: makeGallery("/products/salvador/krovati/bed-mechanism", 2),
-
-  // ✅ временно любая цена (база = "без механизма")
-  priceUZS: 18_900_000,
-  priceRUB: 0,
-
-  // ✅ вот эти кнопки появятся в UI автоматически
-  variants: [
-    {
-      id: "mechanism-base",
-      title: "Без подъёмного механизма",
-      kind: "option",
-      group: "mechanism",
-      priceDeltaUZS: 0,
-      priceDeltaRUB: 0,
-
-      // ✅ по нажатию показываем фото 01
-      gallery: ["/products/salvador/krovati/bed-mechanism/01.jpg"],
-    },
-    {
-      id: "mechanism-lift",
-      title: "С подъёмным механизмом",
-      kind: "option",
-      group: "mechanism",
-      priceDeltaUZS: 3_000_000,
-      priceDeltaRUB: 0,
-
-      // ✅ по нажатию показываем фото 02
-      gallery: ["/products/salvador/krovati/bed-mechanism/02.jpg"],
-    },
-  ],
-
-  attrs: { subType: "bed-mechanism" } as any,
-}),
-
-
-  // 2 папка: кровать с основанием / кровать с подъёмным механизмом (2 фото)
   makeProduct({
     id: "salvador-krovati-bed-mechanism",
     title: "Кровать с подъёмным механизмом",
@@ -90,9 +42,33 @@ makeProduct({
     cat: "krovati",
     basePath: "/products/salvador/krovati/bed-mechanism",
     gallery: makeGallery("/products/salvador/krovati/bed-mechanism", 2),
-    priceUZS: 0,
+
+    // ✅ цена только тут (как было у тебя)
+    priceUZS: 18_900_000,
     priceRUB: 0,
-    attrs: { subType: "bed-mechanism" },
+
+    variants: [
+      {
+        id: "mechanism-base",
+        title: "Без подъёмного механизма",
+        kind: "option",
+        group: "mechanism",
+        priceDeltaUZS: 0,
+        priceDeltaRUB: 0,
+        gallery: ["/products/salvador/krovati/bed-mechanism/01.jpg"],
+      },
+      {
+        id: "mechanism-lift",
+        title: "С подъёмным механизмом",
+        kind: "option",
+        group: "mechanism",
+        priceDeltaUZS: 3_000_000,
+        priceDeltaRUB: 0,
+        gallery: ["/products/salvador/krovati/bed-mechanism/02.jpg"],
+      },
+    ],
+
+    attrs: { subType: "bed-mechanism" } as any,
   }),
 
   // =========================

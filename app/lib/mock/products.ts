@@ -9,7 +9,7 @@ export type ProductMock = {
   sku?: string;
   badge?: string;
 
-  // ✅ добавили коллекцию
+  // ✅ коллекция
   brand?: string; // slug: "scandi"
   collectionLabel?: string; // "SCANDI"
 
@@ -30,12 +30,16 @@ export const PRODUCTS_MOCK: ProductMock[] = (CATALOG_MOCK as any[]).map((p) => {
   return {
     id,
     title: String(p.title ?? ""),
-    href: String(p.href ?? `/catalog?product=${id}`),
+
+    // ✅ ВАЖНО: товар всегда открываем на /product/[id]
+    // Если вдруг где-то вручную задан p.href — используем его, иначе дефолт.
+    href: String(p.href ?? `/product/${id}`),
+
     image: String(p.image ?? ""),
+
     sku: p.sku ? String(p.sku) : p.skuLabel ? String(p.skuLabel) : undefined,
     badge: p.badge ? String(p.badge) : undefined,
 
-    // ✅ коллекция
     brand: brandSlug || undefined,
     collectionLabel: collectionLabel || undefined,
 
