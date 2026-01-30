@@ -1,214 +1,216 @@
 // app/lib/mock/collections-data/salvador.ts
-import { makeProduct, type CatalogProduct } from "../catalog-base";
+import { makeGallery, makeProduct, type CatalogProduct } from "../catalog-base";
 
 export const SALVADOR_PRODUCTS: CatalogProduct[] = [
-  // ✅ Фасады
+  // =========================
+  // КОМОДЫ — SALVADOR
+  // =========================
   makeProduct({
-    id: "salvador-fasadi-standart",
-    title: "SALVADOR · Фасады стандарт",
-    brand: "salvador",
-    cat: "fasadi",
-    basePath: "/products/salvador/fasadi/fasadi-standart",
-    gallery: [
-      "/products/salvador/fasadi/fasadi-standart/01.jpg",
-      "/products/salvador/fasadi/fasadi-standart/02.jpg",
-    ],
-    priceRUB: 89000,
-    priceUZS: 12900000,
-  }),
-  makeProduct({
-    id: "salvador-fasadi-top",
-    title: "SALVADOR · Фасады TOP",
-    brand: "salvador",
-    cat: "fasadi",
-    basePath: "/products/salvador/fasadi/fasadi-top",
-    gallery: ["/products/salvador/fasadi/fasadi-top/01.jpg"],
-    priceRUB: 89000,
-    priceUZS: 12900000,
-  }),
-
-  // ✅ Комоды
-  makeProduct({
-    id: "salvador-komody-shirokie",
-    title: "Комод широкий",
+    id: "salvador-komody-komod",
+    title: "Комод",
     brand: "salvador",
     cat: "komody",
-    basePath: "/products/salvador/komody/komody-shirokie",
-    gallery: ["/products/salvador/komody/komody-shirokie/01.jpg"],
-    priceRUB: 69900,
-    priceUZS: 9800000,
-  }),
-  makeProduct({
-    id: "salvador-komody-standart",
-    title: "Комод стандарт",
-    brand: "salvador",
-    cat: "komody",
-    basePath: "/products/salvador/komody/komody-standart",
-    gallery: ["/products/salvador/komody/komody-standart/01.jpg"],
-    priceRUB: 59900,
-    priceUZS: 8500000,
+    basePath: "/products/salvador/komody/komod",
+    gallery: makeGallery("/products/salvador/komody/komod", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "komod" },
   }),
 
-  // ✅ Кровати
+  // =========================
+  // ЗЕРКАЛА — SALVADOR
+  // =========================
   makeProduct({
-    id: "salvador-krovati-max",
-    title: "Кровать MAX",
-    brand: "salvador",
-    cat: "krovati",
-    basePath: "/products/salvador/krovati/krovati-max",
-    gallery: [
-      "/products/salvador/krovati/krovati-max/01.jpg",
-      "/products/salvador/krovati/krovati-max/02.jpg",
-    ],
-    priceRUB: 149900,
-    priceUZS: 21500000,
-  }),
-  makeProduct({
-    id: "salvador-krovati-min",
-    title: "Кровать MIN",
-    brand: "salvador",
-    cat: "krovati",
-    basePath: "/products/salvador/krovati/krovati-min",
-    gallery: [
-      "/products/salvador/krovati/krovati-min/01.jpg",
-      "/products/salvador/krovati/krovati-min/02.jpg",
-      "/products/salvador/krovati/krovati-min/03.jpg",
-    ],
-    priceRUB: 129900,
-    priceUZS: 18900000,
-  }),
-
-  // ✅ Плинтусы (в папке сразу 01/02, без подпапок)
-  makeProduct({
-    id: "salvador-plintusy-01",
-    title: "Плинтус 01",
-    brand: "salvador",
-    cat: "plintusy",
-    basePath: "/products/salvador/plintusy",
-    coverIndex: 1,
-    gallery: ["/products/salvador/plintusy/01.jpg"],
-    priceRUB: 3900,
-    priceUZS: 490000,
-  }),
-  makeProduct({
-    id: "salvador-plintusy-02",
-    title: "Плинтус 02",
-    brand: "salvador",
-    cat: "plintusy",
-    basePath: "/products/salvador/plintusy",
-    coverIndex: 2,
-    gallery: ["/products/salvador/plintusy/02.jpg"],
-    priceRUB: 3900,
-    priceUZS: 490000,
-  }),
-
-  // ✅ Шкафы
-  makeProduct({
-    id: "salvador-shkafy-max",
-    title: "Шкаф MAX",
-    brand: "salvador",
-    cat: "shkafy",
-    basePath: "/products/salvador/shkafy/shkafy-max",
-    gallery: [
-      "/products/salvador/shkafy/shkafy-max/01.jpg",
-      "/products/salvador/shkafy/shkafy-max/02.jpg",
-      "/products/salvador/shkafy/shkafy-max/03.jpg",
-      "/products/salvador/shkafy/shkafy-max/04.jpg",
-    ],
-    priceRUB: 199900,
-    priceUZS: 29500000,
-  }),
-  makeProduct({
-    id: "salvador-shkafy-min",
-    title: "Шкаф MIN",
-    brand: "salvador",
-    cat: "shkafy",
-    basePath: "/products/salvador/shkafy/shkafy-min",
-    gallery: ["/products/salvador/shkafy/shkafy-min/01.jpg"],
-    priceRUB: 159900,
-    priceUZS: 23900000,
-  }),
-  makeProduct({
-    id: "salvador-shkafy-standart",
-    title: "Шкаф STANDARD",
-    brand: "salvador",
-    cat: "shkafy",
-    basePath: "/products/salvador/shkafy/shkafy-standart",
-    gallery: [
-      "/products/salvador/shkafy/shkafy-standart/01.jpg",
-      "/products/salvador/shkafy/shkafy-standart/02.jpg",
-    ],
-    priceRUB: 169900,
-    priceUZS: 24900000,
-  }),
-
-  // ✅ Стол (в папке только 01)
-  makeProduct({
-    id: "salvador-stoli-01",
-    title: "Стол",
-    brand: "salvador",
-    cat: "stoli",
-    basePath: "/products/salvador/stoli",
-    coverIndex: 1,
-    gallery: ["/products/salvador/stoli/01.jpg"],
-    priceRUB: 39900,
-    priceUZS: 5800000,
-  }),
-
-  // ✅ Тумбы
-  makeProduct({
-    id: "salvador-tumby-standart",
-    title: "Тумба стандарт",
-    brand: "salvador",
-    cat: "tumby",
-    basePath: "/products/salvador/tumby/tumbi-standart",
-    gallery: ["/products/salvador/tumby/tumbi-standart/01.jpg"],
-    priceRUB: 39900,
-    priceUZS: 5800000,
-  }),
-  makeProduct({
-    id: "salvador-tumby-shirokie",
-    title: "Тумба широкая",
-    brand: "salvador",
-    cat: "tumby",
-    basePath: "/products/salvador/tumby/tumby-shirokie",
-    gallery: ["/products/salvador/tumby/tumby-shirokie/01.jpg"],
-    priceRUB: 44900,
-    priceUZS: 6500000,
-  }),
-
-  // ✅ Витрины
-  makeProduct({
-    id: "salvador-vitrini-shirokie",
-    title: "Витрина широкая",
-    brand: "salvador",
-    cat: "vitrini",
-    basePath: "/products/salvador/vitrini/vitrini-shirokie",
-    gallery: ["/products/salvador/vitrini/vitrini-shirokie/01.jpg"],
-    priceRUB: 79900,
-    priceUZS: 11800000,
-  }),
-  makeProduct({
-    id: "salvador-vitrini-visokie",
-    title: "Витрина высокая",
-    brand: "salvador",
-    cat: "vitrini",
-    basePath: "/products/salvador/vitrini/vitrini-visokie",
-    gallery: ["/products/salvador/vitrini/vitrini-visokie/01.jpg"],
-    priceRUB: 99900,
-    priceUZS: 14500000,
-  }),
-
-  // ✅ Зеркало (в папке только 01)
-  makeProduct({
-    id: "salvador-zerkala-01",
-    title: "Зеркало",
+    id: "salvador-zerkala-round",
+    title: "Зеркало круглое",
     brand: "salvador",
     cat: "zerkala",
-    basePath: "/products/salvador/zerkala",
-    coverIndex: 1,
-    gallery: ["/products/salvador/zerkala/01.jpg"],
-    priceRUB: 14900,
-    priceUZS: 2200000,
+    basePath: "/products/salvador/zerkala/round",
+    gallery: makeGallery("/products/salvador/zerkala/round", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "round" },
+  }),
+
+  // =========================
+  // КРОВАТИ — SALVADOR
+  // =========================
+
+  // 1 папка: кровать / кровать с матрасом (2 фото)
+  // 2 папка: кровать с основанием / кровать с подъёмным механизмом (2 фото)
+makeProduct({
+  id: "salvador-krovati-bed-mechanism",
+  title: "Кровать с подъёмным механизмом",
+  brand: "salvador",
+  cat: "krovati",
+  basePath: "/products/salvador/krovati/bed-mechanism",
+
+  // базовая галерея (2 фото в папке)
+  gallery: makeGallery("/products/salvador/krovati/bed-mechanism", 2),
+
+  // ✅ временно любая цена (база = "без механизма")
+  priceUZS: 18_900_000,
+  priceRUB: 0,
+
+  // ✅ вот эти кнопки появятся в UI автоматически
+  variants: [
+    {
+      id: "mechanism-base",
+      title: "Без подъёмного механизма",
+      kind: "option",
+      group: "mechanism",
+      priceDeltaUZS: 0,
+      priceDeltaRUB: 0,
+
+      // ✅ по нажатию показываем фото 01
+      gallery: ["/products/salvador/krovati/bed-mechanism/01.jpg"],
+    },
+    {
+      id: "mechanism-lift",
+      title: "С подъёмным механизмом",
+      kind: "option",
+      group: "mechanism",
+      priceDeltaUZS: 3_000_000,
+      priceDeltaRUB: 0,
+
+      // ✅ по нажатию показываем фото 02
+      gallery: ["/products/salvador/krovati/bed-mechanism/02.jpg"],
+    },
+  ],
+
+  attrs: { subType: "bed-mechanism" } as any,
+}),
+
+
+  // 2 папка: кровать с основанием / кровать с подъёмным механизмом (2 фото)
+  makeProduct({
+    id: "salvador-krovati-bed-mechanism",
+    title: "Кровать с подъёмным механизмом",
+    brand: "salvador",
+    cat: "krovati",
+    basePath: "/products/salvador/krovati/bed-mechanism",
+    gallery: makeGallery("/products/salvador/krovati/bed-mechanism", 2),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "bed-mechanism" },
+  }),
+
+  // =========================
+  // СТОЛЫ — SALVADOR
+  // =========================
+  makeProduct({
+    id: "salvador-stoli-stol-toilet",
+    title: "Стол туалетный",
+    brand: "salvador",
+    cat: "stoli",
+    basePath: "/products/salvador/stoli/stol-toilet",
+    gallery: makeGallery("/products/salvador/stoli/stol-toilet", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "stol-toilet" },
+  }),
+
+  // =========================
+  // ТУМБЫ — SALVADOR
+  // =========================
+  makeProduct({
+    id: "salvador-tumby-tumba-bedside",
+    title: "Тумба прикроватная",
+    brand: "salvador",
+    cat: "tumby",
+    basePath: "/products/salvador/tumby/tumba-bedside",
+    gallery: makeGallery("/products/salvador/tumby/tumba-bedside", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "tumba-bedside" },
+  }),
+  makeProduct({
+    id: "salvador-tumby-tumba-tv",
+    title: "Тумба ТВ",
+    brand: "salvador",
+    cat: "tumby",
+    basePath: "/products/salvador/tumby/tumba-tv",
+    gallery: makeGallery("/products/salvador/tumby/tumba-tv", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "tumba-tv" },
+  }),
+
+  // =========================
+  // ФАСАДЫ — SALVADOR
+  // =========================
+  makeProduct({
+    id: "salvador-fasadi-blind",
+    title: "Фасад глухой",
+    brand: "salvador",
+    cat: "fasadi",
+    basePath: "/products/salvador/fasadi/blind",
+    gallery: makeGallery("/products/salvador/fasadi/blind", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "blind" },
+  }),
+  makeProduct({
+    id: "salvador-fasadi-mirror",
+    title: "Фасад зеркальный",
+    brand: "salvador",
+    cat: "fasadi",
+    basePath: "/products/salvador/fasadi/mirror",
+    gallery: makeGallery("/products/salvador/fasadi/mirror", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "mirror" },
+  }),
+
+  // =========================
+  // ШКАФЫ — SALVADOR
+  // =========================
+  makeProduct({
+    id: "salvador-shkafy-2d",
+    title: "Шкаф двухстворчатый",
+    brand: "salvador",
+    cat: "shkafy",
+    basePath: "/products/salvador/shkafy/2d",
+    gallery: makeGallery("/products/salvador/shkafy/2d", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { doors: 2 },
+  }),
+  makeProduct({
+    id: "salvador-shkafy-4d",
+    title: "Шкаф четырёхстворчатый",
+    brand: "salvador",
+    cat: "shkafy",
+    basePath: "/products/salvador/shkafy/4d",
+    gallery: makeGallery("/products/salvador/shkafy/4d", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { doors: 4 },
+  }),
+  makeProduct({
+    id: "salvador-shkafy-4d-mirror",
+    title: "Шкаф четырёхстворчатый с зеркальными фасадами",
+    brand: "salvador",
+    cat: "shkafy",
+    basePath: "/products/salvador/shkafy/4d-mirror",
+    gallery: makeGallery("/products/salvador/shkafy/4d-mirror", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { doors: 4, facade: "mirror" },
+  }),
+
+  // =========================
+  // ДЕКОР — SALVADOR
+  // =========================
+  makeProduct({
+    id: "salvador-dekor-wardrobe-set",
+    title: "Комплект декора на шкаф",
+    brand: "salvador",
+    cat: "dekor",
+    basePath: "/products/salvador/dekor/wardrobe-set",
+    gallery: makeGallery("/products/salvador/dekor/wardrobe-set", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "wardrobe-set" },
   }),
 ];

@@ -9,8 +9,17 @@ export type CatalogVariant = {
   id: string;
   title: string;
   kind: "color" | "option";
+
+  // ✅ группировка (size / mechanism / facade / ...)
+  group?: string;
+
+  // ✅ для UI: показать, но не давать кликать
+  disabled?: boolean;
+
   priceDeltaRUB?: number;
   priceDeltaUZS?: number;
+
+  // опционально: картинка/галерея для варианта
   image?: string;
   gallery?: string[];
 };
@@ -19,11 +28,7 @@ export type CatalogVariant = {
 export type CatalogAttrs = {
   // шкафы
   doors?: 1 | 2 | 3 | 4;
-  facade?:
-    | "blind"
-    | "mirror"
-    | "combined"
-    | "mirror-combined";
+  facade?: "blind" | "mirror" | "combined" | "mirror-combined";
 
   // на будущее — любые доп. атрибуты
   [k: string]: string | number | boolean | undefined;
@@ -68,17 +73,11 @@ export type CatalogProduct = {
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export function makeGallery(basePath: string, count: number) {
-  return Array.from(
-    { length: count },
-    (_, i) => `${basePath}/${pad2(i + 1)}.jpg`,
-  );
+  return Array.from({ length: count }, (_, i) => `${basePath}/${pad2(i + 1)}.jpg`);
 }
 
 export function makeProduct(
-  p: Omit<
-    CatalogProduct,
-    "image" | "price_rub" | "price_uzs" | "category"
-  > & {
+  p: Omit<CatalogProduct, "image" | "price_rub" | "price_uzs" | "category"> & {
     basePath: string;
     coverIndex?: number;
     collectionKey?: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,6 +21,10 @@ import ProductVariants from "./ProductVariants";
 import ProductLightbox from "./ProductLightbox";
 import ProductRelated from "./ProductRelated";
 
+import { useProductVariants } from "./hooks/useProductVariants";
+import { useProductGallery } from "./hooks/useProductGallery";
+import { useProductLightbox } from "./hooks/useProductLightbox";
+
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
 
@@ -32,9 +36,11 @@ type MegaPreview = {
 };
 
 export type ProductVariant = {
-  id: string; // "white" | "with-lift" | ...
-  title: string; // "Белая" | "С подъёмным механизмом" | ...
+  id: string;
+  title: string;
   kind: "color" | "option";
+  group?: string;
+  disabled?: boolean;
   priceDeltaRUB?: number;
   priceDeltaUZS?: number;
   image?: string;
@@ -66,19 +72,13 @@ export type ProductPageModel = {
     href: string;
     badge?: string;
   }>;
-
-  // ✅ варианты (цвет/модификация)
   variants?: ProductVariant[];
-
-  // UX-связка
   brand?: string;
   category?: string;
   collectionHref?: string;
   categoryLabel?: string;
   collectionLabel?: string;
   collectionPreview?: MegaPreview;
-
-  // ✅ витрина коллекции
   isCollection?: boolean;
 };
 
@@ -94,130 +94,38 @@ export default function ProductClient({
   const shop = useShopState();
   const { isFav, toggleFav, isInCart, addToCart, removeFromCart } = shop;
 
-  // ✅ variants
-  const variants = useMemo<ProductVariant[]>(
-    () => (Array.isArray(product.variants) ? product.variants : []),
-    [product.variants],
-  );
+  const {
+    groups,
+    selectedByGroup,
+    setSelectedByGroup,
+    selectedVariantKey,
+    selectedVariants,
+    variantDelta,
+    groupsForUI,
+  } = useProductVariants(product, currency);
 
-  const defaultVariantId = variants.length ? String(variants[0].id) : "base";
-  const [selectedVariantId, setSelectedVariantId] =
-    useState<string>(defaultVariantId);
+  const { gallery, activeIdx, setActiveIdx, nextMain, prevMain, maxLen } =
+    useProductGallery({
+      product,
+      groups,
+      selectedVariants,
+      selectedByGroup,
+    });
 
-  // ✅ если пришёл другой товар — сбрасываем на дефолтный вариант
-  useEffect(() => {
-    setSelectedVariantId(defaultVariantId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product.id]);
+  const {
+    lightboxOpen,
+    setLightboxOpen,
+    lightboxIdx,
+    setLightboxIdx,
+    openLightbox,
+    nextLb,
+    prevLb,
+  } = useProductLightbox({ maxLen, activeIdx, setActiveIdx });
 
-  const selectedVariant = useMemo(() => {
-    if (!variants.length) return null;
-    return (
-      variants.find((v) => String(v.id) === String(selectedVariantId)) ??
-      variants[0] ??
-      null
-    );
-  }, [variants, selectedVariantId]);
-
-  const variantsKind = useMemo<"color" | "option" | null>(() => {
-    if (!variants.length) return null;
-    const k = variants[0]?.kind;
-    return k === "color" || k === "option" ? k : "option";
-  }, [variants]);
-
-  const variantDelta = useMemo(() => {
-    if (!selectedVariant) return 0;
-    return currency === "RUB"
-      ? Number(selectedVariant.priceDeltaRUB ?? 0) || 0
-      : Number(selectedVariant.priceDeltaUZS ?? 0) || 0;
-  }, [selectedVariant, currency]);
-
-  // ✅ 1) нормализуем галерею (с учётом варианта)
-  const galleryRaw = useMemo(() => {
-    const vg = selectedVariant?.gallery?.filter(Boolean) ?? [];
-    const variantGallery = vg.length ? vg : [];
-
-    const g = variantGallery.length
-      ? variantGallery
-      : Array.isArray(product.gallery)
-        ? product.gallery.filter(Boolean)
-        : [];
-
-    const base = g.length ? g : [product.image].filter(Boolean);
-
-    const uniq: string[] = [];
-    for (const src of base.map(String)) {
-      if (src && !uniq.includes(src)) uniq.push(src);
-    }
-
-    const vi = selectedVariant?.image ? String(selectedVariant.image) : "";
-    if (vi && !uniq.includes(vi)) uniq.unshift(vi);
-
-    return uniq.length ? uniq : [product.image].filter(Boolean);
-  }, [product.gallery, product.image, selectedVariant]);
-
-  // ✅ 2) Для обычного товара: максимум 3 изображения
-  const gallery = useMemo(() => {
-    if (product.isCollection) return galleryRaw;
-    return galleryRaw.slice(0, 3);
-  }, [galleryRaw, product.isCollection]);
-
-  // ----- gallery state (НЕ меняем логику) -----
-  const [activeIdx, setActiveIdx] = useState(0);
-
-  // lightbox
-  const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [lightboxIdx, setLightboxIdx] = useState(0);
-
-  const maxLen = Math.max(1, gallery.length);
-
-  // ✅ при смене товара/варианта — сбрасываем индексы и лайтбокс
-  useEffect(() => {
-    setActiveIdx(0);
-    setLightboxIdx(0);
-    setLightboxOpen(false);
-  }, [product.id, selectedVariantId]);
-
-  useEffect(() => {
-    const last = Math.max(0, gallery.length - 1);
-    if (activeIdx > last) setActiveIdx(0);
-    if (lightboxIdx > last) setLightboxIdx(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gallery.length]);
-
-  const nextMain = () => setActiveIdx((v) => (v + 1) % maxLen);
-  const prevMain = () => setActiveIdx((v) => (v - 1 + maxLen) % maxLen);
-
-  const openLightbox = (idx: number) => {
-    setActiveIdx(idx);
-    setLightboxIdx(idx);
-    setLightboxOpen(true);
-  };
-
-  const nextLb = () => setLightboxIdx((v) => (v + 1) % maxLen);
-  const prevLb = () => setLightboxIdx((v) => (v - 1 + maxLen) % maxLen);
-
-  useEffect(() => {
-    if (lightboxOpen) setLightboxIdx(activeIdx);
-  }, [lightboxOpen, activeIdx]);
-
-  useEffect(() => {
-    if (!lightboxOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightboxOpen(false);
-      if (e.key === "ArrowRight") nextLb();
-      if (e.key === "ArrowLeft") prevLb();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lightboxOpen, maxLen]);
-
-  // ----- qty + cart -----
   const [qty, setQty] = useState(1);
 
-  const fav = isFav(product.id, selectedVariantId);
-  const inCart = isInCart(product.id, selectedVariantId);
+  const fav = isFav(product.id, selectedVariantKey);
+  const inCart = isInCart(product.id, selectedVariantKey);
 
   const baseUnitPrice =
     currency === "RUB" ? product.price_rub : product.price_uzs;
@@ -225,11 +133,10 @@ export default function ProductClient({
   const totalPrice = unitPrice * qty;
 
   const toggleMainCart = () => {
-    if (inCart) removeFromCart(product.id, selectedVariantId);
-    else addToCart(product.id, qty, selectedVariantId);
+    if (inCart) removeFromCart(product.id, selectedVariantKey);
+    else addToCart(product.id, qty, selectedVariantKey);
   };
 
-  // ----- breadcrumbs helpers -----
   const hasCollection =
     !!product.collectionHref &&
     !!product.collectionLabel &&
@@ -237,14 +144,12 @@ export default function ProductClient({
 
   const showCollectionCard = hasCollection && !product.isCollection;
 
-  // ✅ выводим коллекцию рядом с названием (то что ты просил)
   const collectionBadge = String(product.brand || product.collectionLabel || "")
     .trim()
     .toUpperCase();
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-8">
-      {/* breadcrumbs */}
       <div className="mb-4 text-[12px] text-black/40">
         <Link href="/" className="hover:text-black/70">
           Главная
@@ -275,10 +180,9 @@ export default function ProductClient({
         / <span className="text-black/60">{product.title}</span>
       </div>
 
-      {/* top row */}
       <div className="mb-5 flex items-center justify-between">
         <button
-          onClick={() => router.back()} // ✅ сохраняет выбранные фильтры (не сбрасывает)
+          onClick={() => router.back()}
           className={cn(
             "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2",
             "border-black/10 bg-white text-[12px] tracking-[0.16em] uppercase text-black/70",
@@ -291,7 +195,7 @@ export default function ProductClient({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => toggleFav(product.id, selectedVariantId)}
+            onClick={() => toggleFav(product.id, selectedVariantKey)}
             className={cn(
               "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2",
               "border-black/10 bg-white text-[13px] text-black/75 hover:border-black/20 hover:text-black transition",
@@ -319,7 +223,6 @@ export default function ProductClient({
       </div>
 
       <div className="grid gap-10 lg:grid-cols-[520px_1fr]">
-        {/* LEFT */}
         <ProductGallery
           title={product.title}
           gallery={gallery}
@@ -330,7 +233,6 @@ export default function ProductClient({
           onOpenLightbox={openLightbox}
         />
 
-        {/* RIGHT */}
         <aside>
           {collectionBadge ? (
             <div className="mb-2 inline-flex rounded-full border border-black/10 bg-white px-3 py-1 text-[11px] tracking-[0.18em] uppercase text-black/55">
@@ -342,14 +244,10 @@ export default function ProductClient({
             {product.title}
           </h1>
 
-          {/* ✅ Варианты (цвет/модификация) */}
           <ProductVariants
-            variants={variants}
-            variantsKind={variantsKind}
-            selectedVariantId={selectedVariantId}
-            setSelectedVariantId={setSelectedVariantId}
-            selectedVariantTitle={selectedVariant?.title || ""}
-            variantDelta={variantDelta}
+            groups={groupsForUI}
+            selectedByGroup={selectedByGroup}
+            setSelectedByGroup={setSelectedByGroup}
             currency={currency}
           />
 
@@ -408,7 +306,7 @@ export default function ProductClient({
 
             <button
               onClick={() => {
-                shop.setOneClick(product.id, qty, selectedVariantId);
+                shop.setOneClick(product.id, qty, selectedVariantKey);
                 router.push("/checkout?mode=oneclick");
               }}
               className={cn(
@@ -446,13 +344,7 @@ export default function ProductClient({
               </div>
 
               <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-black/5">
-                {/* оставим как было: если нет превью — покажем текст */}
-                {/* (логика не меняется) */}
-                {/* превью рендерится в page.tsx как product.collectionPreview */}
-                {/* здесь только UI */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
                 {product.collectionPreview?.main ? (
-                  // next/image не обязателен тут, но лучше оставим Link-картинку на потом
                   <div className="absolute inset-0" />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-sm text-black/40">

@@ -1,79 +1,91 @@
 // app/lib/mock/collections-data/elizabeth.ts
-import { makeProduct, type CatalogProduct } from "../catalog-base";
+import { makeGallery, makeProduct, type CatalogProduct } from "../catalog-base";
 
 export const ELIZABETH_PRODUCTS: CatalogProduct[] = [
-  // ✅ Комоды (01)
+  // =========================
+  // КРОВАТИ — ELIZABETH
+  // =========================
   makeProduct({
-    id: "elizabeth-komody-01",
-    title: "Комод",
-    brand: "elizabeth",
-    cat: "komody",
-    basePath: "/products/elizabeth/komody",
-    coverIndex: 1,
-    gallery: ["/products/elizabeth/komody/01.jpg"],
-    priceRUB: 59900,
-    priceUZS: 8500000,
-  }),
-
-  // ✅ Кровати (01, 02)
-  makeProduct({
-    id: "elizabeth-krovati",
+    id: "elizabeth-krovati-bed",
     title: "Кровать",
     brand: "elizabeth",
     cat: "krovati",
-    basePath: "/products/elizabeth/krovati",
-    coverIndex: 1,
-    gallery: [
-      "/products/elizabeth/krovati/01.jpg",
-      "/products/elizabeth/krovati/02.jpg",
-    ],
-    priceRUB: 139900,
-    priceUZS: 19900000,
+    basePath: "/products/elizabeth/krovati/bed",
+    gallery: makeGallery("/products/elizabeth/krovati/bed", 2),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "bed" },
   }),
 
-  // ✅ Шкафы (01, 02)
+  // =========================
+  // КОМОДЫ — ELIZABETH
+  // =========================
   makeProduct({
-    id: "elizabeth-shkafy",
-    title: "Шкаф",
+    id: "elizabeth-komody-komod",
+    title: "Комод",
     brand: "elizabeth",
-    cat: "shkafy",
-    basePath: "/products/elizabeth/shkafy",
-    coverIndex: 1,
-    gallery: [
-      "/products/elizabeth/shkafy/01.jpg",
-      "/products/elizabeth/shkafy/02.jpg",
-    ],
-    priceRUB: 189900,
-    priceUZS: 27500000,
+    cat: "komody",
+    basePath: "/products/elizabeth/komody/komod",
+    gallery: makeGallery("/products/elizabeth/komody/komod", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "komod" },
   }),
 
-  // ✅ Стол (01)
+  // =========================
+  // СТОЛЫ — ELIZABETH
+  // =========================
   makeProduct({
-    id: "elizabeth-stoli-01",
-    title: "Стол",
+    id: "elizabeth-stoli-stol-desk",
+    title: "Стол письменный",
     brand: "elizabeth",
     cat: "stoli",
-    basePath: "/products/elizabeth/stoli",
-    coverIndex: 1,
-    gallery: ["/products/elizabeth/stoli/01.jpg"],
-    priceRUB: 39900,
-    priceUZS: 5800000,
+    basePath: "/products/elizabeth/stoli/stol-desk",
+    gallery: makeGallery("/products/elizabeth/stoli/stol-desk", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "stol-desk" },
   }),
 
-  // ✅ Тумбы (01, 02, 03)
+  // =========================
+  // ТУМБЫ — ELIZABETH
+  // =========================
   makeProduct({
-    id: "elizabeth-tumby",
-    title: "Тумба",
+    id: "elizabeth-tumby-tumba-bedside-3drawers",
+    title: "Тумба прикроватная с тремя ящиками",
     brand: "elizabeth",
     cat: "tumby",
-    basePath: "/products/elizabeth/tumby",
-    coverIndex: 1,
-    gallery: [
-      "/products/elizabeth/tumby/01.jpg",
-      "/products/elizabeth/tumby/02.jpg",
-      "/products/elizabeth/tumby/03.jpg",
-    ],
-    priceRUB: 34900,
-    priceUZS: 5100000,
+    basePath: "/products/elizabeth/tumby/tumba-bedside-3drawers",
+    gallery: makeGallery("/products/elizabeth/tumby/tumba-bedside-3drawers", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "tumba-bedside-3drawers" },
+  }),
+
+  makeProduct({
+    id: "elizabeth-tumby-tumba-bedside",
+    title: "Тумба прикроватная",
+    brand: "elizabeth",
+    cat: "tumby",
+    basePath: "/products/elizabeth/tumby/tumba-bedside",
+    gallery: makeGallery("/products/elizabeth/tumby/tumba-bedside", 1),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "tumba-bedside" },
+  }),
+
+  // =========================
+  // ШКАФЫ — ELIZABETH
+  // =========================
+  makeProduct({
+    id: "elizabeth-shkafy-shkaf-4d-drawers",
+    title: "Шкаф четырёхстворчатый с выдвижными ящиками",
+    brand: "elizabeth",
+    cat: "shkafy",
+    basePath: "/products/elizabeth/shkafy/shkaf-4d-drawers",
+    gallery: makeGallery("/products/elizabeth/shkafy/shkaf-4d-drawers", 2),
+    priceUZS: 0,
+    priceRUB: 0,
+    attrs: { subType: "shkaf-4d-drawers" },
   }),
 ];
