@@ -23,43 +23,71 @@ export default function GSAPHeroSlider({
       id: "s1",
       title: "СПАЛЬНЯ SALVADOR",
       ctaLabel: "В КАТАЛОГ",
-      href: "/catalog?cat=bedroom",
+      href: "/catalog?collections=salvador",
       image: "/hero/1.jpg",
     },
     {
       id: "s2",
       title: "СПАЛЬНЯ AMBER",
       ctaLabel: "В КАТАЛОГ",
-      href: "/catalog?cat=living",
+      href: "/catalog?collections=amber",
       image: "/hero/2.jpg",
     },
     {
       id: "s3",
       title: "СПАЛЬНЯ SCANDY",
       ctaLabel: "В КАТАЛОГ",
-      href: "/catalog?cat=office",
+      href: "/catalog?collections=scandi",
       image: "/hero/3.jpg",
     },
     {
       id: "s4",
       title: "СПАЛЬНЯ BUONGIORNO",
       ctaLabel: "В КАТАЛОГ",
-      href: "/catalog?cat=living",
+      href: "/catalog?collections=buongiorno",
       image: "/hero/4.jpg",
     },
     {
       id: "s5",
       title: "ГОСТИННАЯ BUONGIORNO",
       ctaLabel: "В КАТАЛОГ",
-      href: "/catalog?cat=living",
+      href: "/catalog?collections=buongiorno",
       image: "/hero/5.jpg",
     },
     {
       id: "s6",
-      title: "ДЕТСКАЯ ELIZABETH",
+      title: "МОЛОДЁЖНАЯ ELIZABETH",
       ctaLabel: "В КАТАЛОГ",
-      href: "/catalog?cat=living",
+      href: "/catalog?collections=elizabeth",
       image: "/hero/6.jpg",
+    },
+    {
+      id: "s7",
+      title: "ГОСТИНАЯ SALVADOR",
+      ctaLabel: "В КАТАЛОГ",
+      href: "/catalog?collections=salvador",
+      image: "/hero/8.jpg",
+    },
+    {
+      id: "s8",
+      title: "ГОСТИНАЯ PITTI",
+      ctaLabel: "В КАТАЛОГ",
+      href: "/catalog?collections=pitti",
+      image: "/hero/9.jpg",
+    },
+    {
+      id: "s9",
+      title: "ГОСТИНАЯ SKANDY",
+      ctaLabel: "В КАТАЛОГ",
+      href: "/catalog?collections=scandi",
+      image: "/hero/10.jpg",
+    },
+    {
+      id: "s10",
+      title: "МОЛОДЁЖНАЯ SKANDY",
+      ctaLabel: "В КАТАЛОГ",
+      href: "/catalog?collections=scandi",
+      image: "/hero/11.jpg",
     },
   ] as Slide[],
   autoMs = 5200,
@@ -362,7 +390,6 @@ export default function GSAPHeroSlider({
             <ChevronRight className="h-5 w-5 text-black/80" />
           </button>
 
-          {/* dots: пилюли */}
           {/* dots */}
           <div className="absolute bottom-4 left-0 right-0 z-[999] flex justify-center pointer-events-auto">
             {/* лёгкая подложка, чтобы точки всегда читались */}
