@@ -1,4 +1,3 @@
-// app/context/shop-state.tsx
 "use client";
 
 import React, {
@@ -20,27 +19,22 @@ import React, {
 
 export type VariantRef = {
   id: string; // variantId (например "white", "with-lift")
-  title?: string; // "Белая", "С подъёмным механизмом" (необязательно хранить, но удобно)
+  title?: string; // "Белая", "С подъёмным механизмом"
 };
 
 export type ItemKey = string; // "productId::variantId"
-
-type CartMap = Record<ItemKey, number>; // key -> qty
-
+type CartMap = Record<ItemKey, number>;
 type OneClick = { id: ItemKey; qty: number } | null;
 
 export type ShopState = {
-  // ✅ favorites теперь хранит ключи (id::variantId)
   favorites: ItemKey[];
   isFav: (productId: string, variantId?: string) => boolean;
   toggleFav: (productId: string, variant?: VariantRef | string) => void;
   favCount: number;
 
-  // ✅ cart теперь хранит ключи (id::variantId)
   cart: CartMap;
   cartCount: number;
   isInCart: (productId: string, variantId?: string) => boolean;
-
   addToCart: (
     productId: string,
     qty?: number,
@@ -48,11 +42,9 @@ export type ShopState = {
   ) => void;
   removeFromCart: (productId: string, variantId?: string) => void;
   toggleCart: (productId: string, variant?: VariantRef | string) => void;
-
   setCartQty: (productId: string, qty: number, variantId?: string) => void;
   clearCart: () => void;
 
-  // ✅ one-click режим (checkout?mode=oneclick) — тоже по ключу itemKey
   oneClick: OneClick;
   setOneClick: (
     productId: string,
@@ -61,7 +53,6 @@ export type ShopState = {
   ) => void;
   clearOneClick: () => void;
 
-  // ✅ утилиты (удобно использовать в UI)
   makeKey: (productId: string, variantId?: string) => ItemKey;
   parseKey: (key: ItemKey) => { productId: string; variantId: string };
 };
@@ -96,10 +87,11 @@ function makeKey(productId: string, variantId?: string): ItemKey {
 function parseKey(key: ItemKey) {
   const raw = String(key);
   const idx = raw.indexOf(SEP);
+
   if (idx === -1) {
-    // старые ключи без варианта — считаем base
     return { productId: raw, variantId: DEFAULT_VARIANT_ID };
   }
+
   return {
     productId: raw.slice(0, idx),
     variantId: normVariantId(raw.slice(idx + SEP.length)),
@@ -114,8 +106,7 @@ function pickVariantId(variant?: VariantRef | string) {
 
 function migrateFavorites(raw: any): ItemKey[] {
   if (!Array.isArray(raw)) return [];
-  // было: ["productId", ...]
-  // стало: ["productId::base", ...] (или уже новые ключи)
+
   return raw
     .map((x) => String(x))
     .filter(Boolean)
@@ -125,6 +116,7 @@ function migrateFavorites(raw: any): ItemKey[] {
 function migrateCart(raw: any): CartMap {
   if (!raw || typeof raw !== "object") return {};
   const out: CartMap = {};
+
   for (const [k0, v0] of Object.entries(raw)) {
     const qty = Math.max(0, Math.floor(Number(v0 || 0)));
     if (qty <= 0) continue;
@@ -133,14 +125,18 @@ function migrateCart(raw: any): CartMap {
     const key = k.includes(SEP) ? k : makeKey(k, DEFAULT_VARIANT_ID);
     out[key] = (out[key] ?? 0) + qty;
   }
+
   return out;
 }
 
 function migrateOneClick(raw: any): OneClick {
   if (!raw || typeof raw !== "object") return null;
+
   const id = raw?.id ? String(raw.id) : "";
   const qty = Math.max(1, Math.floor(Number(raw?.qty || 1)));
+
   if (!id) return null;
+
   const key = id.includes(SEP) ? id : makeKey(id, DEFAULT_VARIANT_ID);
   return { id: key, qty };
 }
@@ -202,12 +198,14 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
       const q = Math.max(1, Math.floor(qty || 1));
       const key = makeKey(productId, pickVariantId(variant));
 
-      setCart((prev) => ({ ...prev, [key]: (prev[key] ?? 0) + q }));
+      setCart((prev) => ({
+        ...prev,
+        [key]: (prev[key] ?? 0) + q,
+      }));
     };
 
     const removeFromCart = (productId: string, variantId?: string) => {
       const key = makeKey(productId, variantId);
-
       setCart((prev) => {
         const n = { ...prev };
         delete n[key];
@@ -220,11 +218,13 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
 
       setCart((prev) => {
         const exists = (prev[key] ?? 0) > 0;
+
         if (exists) {
           const n = { ...prev };
           delete n[key];
           return n;
         }
+
         return { ...prev, [key]: 1 };
       });
     };
@@ -234,11 +234,13 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
 
       setCart((prev) => {
         const q = Math.max(0, Math.floor(qty || 0));
+
         if (q <= 0) {
           const n = { ...prev };
           delete n[key];
           return n;
         }
+
         return { ...prev, [key]: q };
       });
     };
@@ -269,11 +271,9 @@ export function ShopStateProvider({ children }: { children: React.ReactNode }) {
       cart,
       cartCount,
       isInCart,
-
       addToCart,
       removeFromCart,
       toggleCart,
-
       setCartQty,
       clearCart,
 

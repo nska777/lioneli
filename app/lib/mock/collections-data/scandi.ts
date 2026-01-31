@@ -2,7 +2,7 @@
 import { makeGallery, makeProduct, type CatalogProduct } from "../catalog-base";
 
 // =========================
-// SCANDI — COLORS (кровати)
+// SCANDI — COLORS (универсально)
 // =========================
 const OAK = "Белый";
 const CAPPUCCINO = "Капучино";
@@ -10,6 +10,48 @@ const CAPPUCCINO = "Капучино";
 // если капучино дороже — поставь дельту (можешь 0 оставить)
 const CAPPUCCINO_DELTA_UZS = 0;
 const CAPPUCCINO_DELTA_RUB = 0;
+
+// helpers
+function withColorVariants(opts: {
+  baseGallery: string[];
+  basePath: string; // например "/products/scandi/shkafy/1d-blind"
+  countForAlt?: number; // если хочешь генерить alt через makeGallery
+}) {
+  const { baseGallery, basePath } = opts;
+
+  // 🔁 по умолчанию ожидаем, что капучино лежит в отдельной папке с суффиксом -cappuccino
+  // например: /products/scandi/shkafy/1d-blind-cappuccino/01.jpg
+  // Если таких файлов нет — ничего не сломается: UI будет, но картинки могут совпасть.
+  const cappuccinoBasePath = `${basePath}-cappuccino`;
+
+  // если базовая галерея сделана makeGallery(path, 1) — там один файл 01.jpg,
+  // мы можем сделать alt тоже через makeGallery(..., 1)
+  const cappuccinoGallery =
+    opts.countForAlt && opts.countForAlt > 0
+      ? makeGallery(cappuccinoBasePath, opts.countForAlt)
+      : baseGallery.map((src) => src.replace(basePath, cappuccinoBasePath));
+
+  return [
+    {
+      id: "color-oak",
+      title: OAK,
+      kind: "color" as const,
+      group: "color",
+      priceDeltaUZS: 0,
+      priceDeltaRUB: 0,
+      gallery: baseGallery,
+    },
+    {
+      id: "color-cappuccino",
+      title: CAPPUCCINO,
+      kind: "color" as const,
+      group: "color",
+      priceDeltaUZS: CAPPUCCINO_DELTA_UZS,
+      priceDeltaRUB: CAPPUCCINO_DELTA_RUB,
+      gallery: cappuccinoGallery,
+    },
+  ];
+}
 
 export const SCANDI_PRODUCTS: CatalogProduct[] = [
   // =========================
@@ -25,6 +67,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/1d-blind", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/1d-blind", 1),
+      basePath: "/products/scandi/shkafy/1d-blind",
+      countForAlt: 1,
+    }),
     attrs: { doors: 1, facade: "blind" },
   }),
 
@@ -37,6 +84,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/1d-mirror", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/1d-mirror", 1),
+      basePath: "/products/scandi/shkafy/1d-mirror",
+      countForAlt: 1,
+    }),
     attrs: { doors: 1, facade: "mirror" },
   }),
 
@@ -49,6 +101,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/2d-mirror", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/2d-mirror", 1),
+      basePath: "/products/scandi/shkafy/2d-mirror",
+      countForAlt: 1,
+    }),
     attrs: { doors: 2, facade: "mirror" },
   }),
 
@@ -61,6 +118,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/2d-blind", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/2d-blind", 1),
+      basePath: "/products/scandi/shkafy/2d-blind",
+      countForAlt: 1,
+    }),
     attrs: { doors: 2, facade: "blind" },
   }),
 
@@ -73,6 +135,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/3d-blind", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/3d-blind", 1),
+      basePath: "/products/scandi/shkafy/3d-blind",
+      countForAlt: 1,
+    }),
     attrs: { doors: 3, facade: "blind" },
   }),
 
@@ -85,6 +152,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/3d-mirror", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/3d-mirror", 1),
+      basePath: "/products/scandi/shkafy/3d-mirror",
+      countForAlt: 1,
+    }),
     attrs: { doors: 3, facade: "mirror" },
   }),
 
@@ -97,6 +169,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/3d-blind-combined", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/3d-blind-combined", 1),
+      basePath: "/products/scandi/shkafy/3d-blind-combined",
+      countForAlt: 1,
+    }),
     attrs: { doors: 3, facade: "combined" },
   }),
 
@@ -109,6 +186,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/3d-mirror-combined", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/3d-mirror-combined", 1),
+      basePath: "/products/scandi/shkafy/3d-mirror-combined",
+      countForAlt: 1,
+    }),
     attrs: { doors: 3, facade: "mirror-combined" },
   }),
 
@@ -121,6 +203,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/4d-blind", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/4d-blind", 1),
+      basePath: "/products/scandi/shkafy/4d-blind",
+      countForAlt: 1,
+    }),
     attrs: { doors: 4, facade: "blind" },
   }),
 
@@ -133,6 +220,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/shkafy/4d-mirror", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/shkafy/4d-mirror", 1),
+      basePath: "/products/scandi/shkafy/4d-mirror",
+      countForAlt: 1,
+    }),
     attrs: { doors: 4, facade: "mirror" },
   }),
 
@@ -149,6 +241,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/vitrini/1d-blind", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/vitrini/1d-blind", 1),
+      basePath: "/products/scandi/vitrini/1d-blind",
+      countForAlt: 1,
+    }),
     attrs: { doors: 1, facade: "blind" },
   }),
   makeProduct({
@@ -160,6 +257,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/vitrini/1d-glass", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/vitrini/1d-glass", 1),
+      basePath: "/products/scandi/vitrini/1d-glass",
+      countForAlt: 1,
+    }),
     attrs: { doors: 1, facade: "glass" },
   }),
   makeProduct({
@@ -171,6 +273,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/vitrini/1d-glass-shelves", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/vitrini/1d-glass-shelves", 1),
+      basePath: "/products/scandi/vitrini/1d-glass-shelves",
+      countForAlt: 1,
+    }),
     attrs: { doors: 1, facade: "glass-shelves" },
   }),
 
@@ -183,6 +290,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/vitrini/2d-blind", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/vitrini/2d-blind", 1),
+      basePath: "/products/scandi/vitrini/2d-blind",
+      countForAlt: 1,
+    }),
     attrs: { doors: 2, facade: "blind" },
   }),
   makeProduct({
@@ -194,6 +306,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/vitrini/2d-glass", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/vitrini/2d-glass", 1),
+      basePath: "/products/scandi/vitrini/2d-glass",
+      countForAlt: 1,
+    }),
     attrs: { doors: 2, facade: "glass" },
   }),
   makeProduct({
@@ -205,6 +322,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/vitrini/2d-glass-shelves", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/vitrini/2d-glass-shelves", 1),
+      basePath: "/products/scandi/vitrini/2d-glass-shelves",
+      countForAlt: 1,
+    }),
     attrs: { doors: 2, facade: "glass-shelves" },
   }),
 
@@ -221,6 +343,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/komody/3-drawers", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/komody/3-drawers", 1),
+      basePath: "/products/scandi/komody/3-drawers",
+      countForAlt: 1,
+    }),
     attrs: { subType: "3-drawers" },
   }),
 
@@ -233,6 +360,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/komody/wide", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/komody/wide", 1),
+      basePath: "/products/scandi/komody/wide",
+      countForAlt: 1,
+    }),
     attrs: { subType: "wide" },
   }),
 
@@ -249,6 +381,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/zerkala/on-dresser", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/zerkala/on-dresser", 1),
+      basePath: "/products/scandi/zerkala/on-dresser",
+      countForAlt: 1,
+    }),
     attrs: { subType: "on-dresser" },
   }),
 
@@ -261,6 +398,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/zerkala/wide", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/zerkala/wide", 1),
+      basePath: "/products/scandi/zerkala/wide",
+      countForAlt: 1,
+    }),
     attrs: { subType: "wide" },
   }),
 
@@ -277,6 +419,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/stoli/desk", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/stoli/desk", 1),
+      basePath: "/products/scandi/stoli/desk",
+      countForAlt: 1,
+    }),
     attrs: { subType: "desk" },
   }),
 
@@ -289,6 +436,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/stoli/toilet", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/stoli/toilet", 1),
+      basePath: "/products/scandi/stoli/toilet",
+      countForAlt: 1,
+    }),
     attrs: { subType: "toilet" },
   }),
 
@@ -305,6 +457,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/tumby/bedside", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/tumby/bedside", 1),
+      basePath: "/products/scandi/tumby/bedside",
+      countForAlt: 1,
+    }),
     attrs: { subType: "bedside" },
   }),
 
@@ -317,6 +474,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/tumby/tv", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/tumby/tv", 1),
+      basePath: "/products/scandi/tumby/tv",
+      countForAlt: 1,
+    }),
     attrs: { subType: "tv" },
   }),
 
@@ -333,6 +495,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/fasadi/blind", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/fasadi/blind", 1),
+      basePath: "/products/scandi/fasadi/blind",
+      countForAlt: 1,
+    }),
     attrs: { subType: "blind" },
   }),
 
@@ -345,11 +512,16 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     gallery: makeGallery("/products/scandi/fasadi/mirror", 1),
     priceUZS: 0,
     priceRUB: 0,
+    variants: withColorVariants({
+      baseGallery: makeGallery("/products/scandi/fasadi/mirror", 1),
+      basePath: "/products/scandi/fasadi/mirror",
+      countForAlt: 1,
+    }),
     attrs: { subType: "mirror" },
   }),
 
   // =========================
-  // КРОВАТИ — SCANDI (добавили COLOR, размер/механизм оставили)
+  // КРОВАТИ — SCANDI (твои как были, оставил)
   // =========================
 
   makeProduct({
@@ -358,19 +530,14 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     brand: "scandi",
     cat: "krovati",
     basePath: "/products/scandi/krovati/min-base",
-
-    // базовая галерея (под первый цвет)
     gallery: [
       "/products/scandi/krovati/min-base/01.jpg",
       "/products/scandi/krovati/min-base/02.jpg",
     ],
-
-    // базовая цена для 120×200 (как было)
     priceUZS: 18_900_000,
     priceRUB: 0,
 
     variants: [
-      // SIZE — оставляем как есть по логике цены, но gallery не задаём
       {
         id: "size-120x200",
         title: "120×200",
@@ -388,7 +555,6 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
         priceDeltaRUB: 0,
       },
 
-      // COLOR — новая группа, управляет картинками
       {
         id: "color-oak",
         title: OAK,
@@ -424,19 +590,11 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
     brand: "scandi",
     cat: "krovati",
     basePath: "/products/scandi/krovati/min-lift",
-
-    // базовая галерея
-    gallery: [
-      "/products/scandi/krovati/min-lift/01.jpg",
-      // если у lift есть 02 — добавь файл и раскомментируй строку ниже
-      // "/products/scandi/krovati/min-lift/02.jpg",
-    ],
-
+    gallery: ["/products/scandi/krovati/min-lift/01.jpg"],
     priceUZS: 21_900_000,
     priceRUB: 0,
 
     variants: [
-      // size — фиксируем 160×200 (как было)
       {
         id: "size-160x200",
         title: "160×200",
@@ -446,7 +604,6 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
         priceDeltaRUB: 0,
       },
 
-      // mechanism — как было
       {
         id: "mechanism-lift",
         title: "С подъёмным механизмом",
@@ -465,7 +622,6 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
         priceDeltaRUB: 0,
       },
 
-      // COLOR — новая группа
       {
         id: "color-oak",
         title: OAK,
@@ -473,10 +629,7 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
         group: "color",
         priceDeltaUZS: 0,
         priceDeltaRUB: 0,
-        gallery: [
-          "/products/scandi/krovati/min-lift/01.jpg",
-          // "/products/scandi/krovati/min-lift/02.jpg",
-        ],
+        gallery: ["/products/scandi/krovati/min-lift/01.jpg"],
       },
       {
         id: "color-cappuccino",
@@ -485,11 +638,7 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
         group: "color",
         priceDeltaUZS: CAPPUCCINO_DELTA_UZS,
         priceDeltaRUB: CAPPUCCINO_DELTA_RUB,
-        gallery: [
-          "/products/scandi/krovati/min-lift-cappuccino/01.jpg",
-          // если есть 02 — добавь и раскомментируй
-          // "/products/scandi/krovati/min-lift-cappuccino/02.jpg",
-        ],
+        gallery: ["/products/scandi/krovati/min-lift-cappuccino/01.jpg"],
       },
     ],
 

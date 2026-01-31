@@ -95,14 +95,31 @@ export default function ProductClient({
   const { isFav, toggleFav, isInCart, addToCart, removeFromCart } = shop;
 
   const {
-    groups,
     selectedByGroup,
     setSelectedByGroup,
-    selectedVariantKey,
     selectedVariants,
     variantDelta,
     groupsForUI,
   } = useProductVariants(product, currency);
+
+  /**
+   * ✅ ВАЖНО:
+   * Строим свой variantKey из selectedByGroup, чтобы:
+   * - color точно попадал в ключ
+   * - cacheKey у useProductGallery менялся при смене цвета
+   * - ProductGallery пересоздавался (key)
+   * - корзина/избранное различали варианты
+   */
+  const variantKey = useMemo(() => {
+    const entries = Object.entries(selectedByGroup || {})
+      .filter(([, v]) => typeof v === "string" && v.length > 0)
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    if (!entries.length) return null;
+
+    // group:id | group:id ...
+    return entries.map(([g, v]) => `${g}:${v}`).join("|");
+  }, [selectedByGroup]);
 
   // ✅ Берём галерею/картинку выбранного варианта (цвета)
   const variantGallery = useMemo(() => {
@@ -126,7 +143,8 @@ export default function ProductClient({
       },
       {
         variantGallery,
-        cacheKey: `${product.id}:${selectedVariantKey ?? "base"}`,
+        // ✅ cacheKey теперь точно меняется при смене color
+        cacheKey: `${product.id}:${variantKey ?? "base"}`,
       },
     );
 
@@ -144,8 +162,9 @@ export default function ProductClient({
 
   const [qty, setQty] = useState(1);
 
-  const fav = isFav(product.id, selectedVariantKey);
-  const inCart = isInCart(product.id, selectedVariantKey);
+  // ✅ ВАЖНО: везде используем variantKey (а не selectedVariantKey)
+  const fav = isFav(product.id, variantKey);
+  const inCart = isInCart(product.id, variantKey);
 
   const baseUnitPrice =
     currency === "RUB" ? product.price_rub : product.price_uzs;
@@ -153,8 +172,8 @@ export default function ProductClient({
   const totalPrice = unitPrice * qty;
 
   const toggleMainCart = () => {
-    if (inCart) removeFromCart(product.id, selectedVariantKey);
-    else addToCart(product.id, qty, selectedVariantKey);
+    if (inCart) removeFromCart(product.id, variantKey);
+    else addToCart(product.id, qty, variantKey);
   };
 
   const hasCollection =
@@ -215,7 +234,7 @@ export default function ProductClient({
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => toggleFav(product.id, selectedVariantKey)}
+            onClick={() => toggleFav(product.id, variantKey)}
             className={cn(
               "cursor-pointer inline-flex items-center gap-2 rounded-full border px-4 py-2",
               "border-black/10 bg-white text-[13px] text-black/75 hover:border-black/20 hover:text-black transition",
@@ -244,7 +263,8 @@ export default function ProductClient({
 
       <div className="grid gap-10 lg:grid-cols-[520px_1fr]">
         <ProductGallery
-          key={`${product.id}-${gallery.length}-${selectedVariantKey ?? "base"}`}
+          // ✅ key теперь меняется при смене color
+          key={`${product.id}-${gallery.length}-${variantKey ?? "base"}`}
           title={product.title}
           gallery={gallery}
           activeIdx={activeIdx}
@@ -327,7 +347,7 @@ export default function ProductClient({
 
             <button
               onClick={() => {
-                shop.setOneClick(product.id, qty, selectedVariantKey);
+                shop.setOneClick(product.id, qty, variantKey);
                 router.push("/checkout?mode=oneclick");
               }}
               className={cn(
@@ -359,6 +379,7 @@ export default function ProductClient({
                     {product.categoryLabel} / {product.collectionLabel}
                   </div>
                 </div>
+
                 <div className="h-9 w-9 rounded-full border border-black/10 bg-white grid place-items-center">
                   <ArrowUpRight className="h-4 w-4 text-black/60" />
                 </div>
