@@ -110,8 +110,16 @@ function normalizeRoomToken(v: string) {
   return t;
 }
 
+// ✅ Список "Room-меню" (разделы типа Спальни/Гостиные/Молодёжные...)
+const ROOM_MENUS_SET = new Set(ROOM_ITEMS.map((x) => norm(x.value)));
+
 function getRoomSlug(p: ProductAny) {
-  return norm(p.menu ?? p.room ?? p.section ?? p.category ?? p.room_slug ?? "");
+  // ✅ Ключевой момент:
+  // - для "товаров-наборов" (спальня/гостиная как комната) мы будем хранить room в `cat`
+  // - для обычных товаров остаётся старый fallback
+  return norm(
+    p.cat ?? p.menu ?? p.room ?? p.section ?? p.category ?? p.room_slug ?? "",
+  );
 }
 
 function getCollectionSlug(p: ProductAny) {
@@ -371,6 +379,11 @@ export default function CatalogClient({
   const activeCollection = sidebarValue.collections[0] || "";
   const activeModule = sidebarValue.types[0] || "";
 
+  // ✅ RoomMode = выбран один из разделов комнат (bedrooms/living/youth...)
+  // В этом режиме мы показываем "наборы комнат" (спальня/гостиная как продукт)
+  // и игнорируем модульные типы (types).
+  const isRoomMode = !!activeRoom && ROOM_MENUS_SET.has(norm(activeRoom));
+
   const isDoorsFacadeUI =
     activeModule === "shkafy" || activeModule === "vitrini";
 
@@ -383,9 +396,12 @@ export default function CatalogClient({
   const filtered = useMemo(() => {
     const needle = qFromUrl.toLowerCase();
 
+    // ✅ Важно: door/facade фильтры имеют смысл только в модульном режиме
+    // (шкафы/витрины). В режиме комнат мы их НЕ применяем.
     const isDoorFacadeFilter =
-      sidebarValue.types.includes("shkafy") ||
-      sidebarValue.types.includes("vitrini");
+      !isRoomMode &&
+      (sidebarValue.types.includes("shkafy") ||
+        sidebarValue.types.includes("vitrini"));
 
     const doorsSet = new Set(selectedDoors);
     const facadeSet = new Set(selectedFacades);
@@ -393,11 +409,18 @@ export default function CatalogClient({
     return MOCK.filter((pAny) => {
       const p = pAny as ProductAny;
 
+      // -------------------------
+      // 1) ROOM (раздел: спальни/гостиные/...)
+      // -------------------------
       const room = getRoomSlug(p);
+
       if (sidebarValue.menu.length) {
         if (room && !sidebarValue.menu.includes(room)) return false;
       }
 
+      // -------------------------
+      // 2) COLLECTION (коллекции/бренды)
+      // -------------------------
       const col = getCollectionSlug(p);
       if (
         sidebarValue.collections.length &&
@@ -406,26 +429,37 @@ export default function CatalogClient({
         return false;
       }
 
-      const mod = getModuleSlug(p);
-      if (sidebarValue.types.length && !sidebarValue.types.includes(mod))
-        return false;
+      // -------------------------
+      // 3) MODULE TYPE (типы/модули) — только если НЕ RoomMode
+      // -------------------------
+      if (!isRoomMode) {
+        const mod = getModuleSlug(p);
+        if (sidebarValue.types.length && !sidebarValue.types.includes(mod))
+          return false;
 
-      // ✅ Doors / Facade для шкафов И витрин
-      if (isDoorFacadeFilter && (mod === "shkafy" || mod === "vitrini")) {
-        if (doorsSet.size) {
-          const d = String(p.attrs?.doors ?? "");
-          if (!doorsSet.has(d)) return false;
-        }
-        if (facadeSet.size) {
-          const f = String(p.attrs?.facade ?? "");
-          if (!facadeSet.has(f)) return false;
+        // ✅ Doors / Facade для шкафов И витрин
+        if (isDoorFacadeFilter && (mod === "shkafy" || mod === "vitrini")) {
+          if (doorsSet.size) {
+            const d = String(p.attrs?.doors ?? "");
+            if (!doorsSet.has(d)) return false;
+          }
+          if (facadeSet.size) {
+            const f = String(p.attrs?.facade ?? "");
+            if (!facadeSet.has(f)) return false;
+          }
         }
       }
 
+      // -------------------------
+      // 4) PRICE (цена)
+      // -------------------------
       const price = priceOf(p);
       if (price < sidebarValue.priceMin) return false;
       if (price > sidebarValue.priceMax) return false;
 
+      // -------------------------
+      // 5) SEARCH (поиск)
+      // -------------------------
       if (needle) {
         const hay = `${p.title ?? ""} ${p.badge ?? ""}`.toLowerCase();
         if (!hay.includes(needle)) return false;
@@ -437,6 +471,7 @@ export default function CatalogClient({
   }, [
     qFromUrl,
     region,
+    isRoomMode,
     sidebarValue.menu.join(","),
     sidebarValue.collections.join(","),
     sidebarValue.types.join(","),
@@ -563,12 +598,32 @@ export default function CatalogClient({
                 activeCollection === normalizeCollectionToken(v) ? "" : v,
               )
             }
-            onPickModule={(v) =>
-              setSingleCSVParam(
-                "types",
-                activeModule === normalizeModuleToken(v) ? "" : v,
-              )
-            }
+            // ✅ УМНО: если выбрана комната (RoomMode) и ты кликаешь модуль —
+            // мы автоматически выходим из RoomMode (убираем menu) и включаем types
+            onPickModule={(v) => {
+              const next =
+                activeModule === normalizeModuleToken(v) ? "" : String(v ?? "");
+
+              pushParams((params) => {
+                // если выбираем модуль (next не пустой) в режиме комнаты — выходим из комнаты
+                if (isRoomMode && next) {
+                  params.delete("menu");
+                }
+
+                // применяем types
+                let clean = String(next ?? "").trim();
+                clean = normalizeModuleToken(clean);
+                if (!clean) params.delete("types");
+                else params.set("types", clean);
+
+                // если ушли с "Шкафы" или "Витрины" — подфильтры сбрасываем
+                const m = norm(clean);
+                if (m !== "shkafy" && m !== "vitrini") {
+                  params.delete("doors");
+                  params.delete("facade");
+                }
+              });
+            }}
             // doors/facade
             isDoorsFacadeUI={isDoorsFacadeUI}
             doorsTitle={

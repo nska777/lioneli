@@ -104,13 +104,33 @@ export default function ProductClient({
     groupsForUI,
   } = useProductVariants(product, currency);
 
-  const { gallery, activeIdx, setActiveIdx, nextMain, prevMain, maxLen } =
-    useProductGallery({
-      product,
-      groups,
-      selectedVariants,
-      selectedByGroup,
-    });
+  // ✅ Берём галерею/картинку выбранного варианта (цвета)
+  const variantGallery = useMemo(() => {
+    const withGallery = selectedVariants.find(
+      (v) => Array.isArray(v.gallery) && v.gallery.length > 0,
+    );
+    if (withGallery?.gallery?.length) return withGallery.gallery;
+
+    const withImage = selectedVariants.find((v) => !!v.image);
+    if (withImage?.image) return [withImage.image];
+
+    return null;
+  }, [selectedVariants]);
+
+  const { gallery, activeIdx, setActiveIdx, onPrev, onNext } =
+    useProductGallery(
+      {
+        id: product.id,
+        image: product.image,
+        gallery: product.gallery,
+      },
+      {
+        variantGallery,
+        cacheKey: `${product.id}:${selectedVariantKey ?? "base"}`,
+      },
+    );
+
+  const maxLen = gallery.length;
 
   const {
     lightboxOpen,
@@ -224,13 +244,14 @@ export default function ProductClient({
 
       <div className="grid gap-10 lg:grid-cols-[520px_1fr]">
         <ProductGallery
+          key={`${product.id}-${gallery.length}-${selectedVariantKey ?? "base"}`}
           title={product.title}
           gallery={gallery}
           activeIdx={activeIdx}
           setActiveIdx={setActiveIdx}
-          onPrev={prevMain}
-          onNext={nextMain}
-          onOpenLightbox={openLightbox}
+          onPrev={onPrev}
+          onNext={onNext}
+          onOpenLightbox={(idx) => openLightbox(idx)}
         />
 
         <aside>

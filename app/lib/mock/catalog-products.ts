@@ -2,8 +2,16 @@
 // ✅ Тонкий сборщик: BRANDS / CATS / COLLECTION_PRODUCTS / CATALOG_MOCK / CATALOG_BY_ID
 // ✅ + DEV-защита: лог дублей id (чтобы не было "кровать из SCANDI везде")
 
-export type { BrandItem, CatItem, CatalogVariant, CatalogProduct } from "./catalog-base";
+export type {
+  BrandItem,
+  CatItem,
+  CatalogVariant,
+  CatalogProduct,
+} from "./catalog-base";
 import type { BrandItem, CatItem, CatalogProduct } from "./catalog-base";
+
+// ✅ генератор сцен (спальни / гостиные / молодежные) → товары
+import { buildSectionSceneProducts } from "./section-scenes-as-products";
 
 import {
   SCANDI_PRODUCTS,
@@ -14,7 +22,9 @@ import {
   AMBER_PRODUCTS,
 } from "./collections-data";
 
-// ✅ коллекции (бренды/серии)
+// ==============================
+// BRANDS (коллекции)
+// ==============================
 export const BRANDS: BrandItem[] = [
   { title: "AMBER", slug: "amber" },
   { title: "BUONGIORNO", slug: "buongiorno" },
@@ -24,37 +34,52 @@ export const BRANDS: BrandItem[] = [
   { title: "SCANDI", slug: "scandi" },
 ];
 
-// ✅ категории/модули
-// ⚠️ Важно: slug должен 1-в-1 совпадать с путями в public
+// ==============================
+// CATS (категории / модули + комнаты)
+// ⚠️ slug должен совпадать с путями в public
+// ==============================
 export const CATS: CatItem[] = [
+  // модули
   { title: "Фасады", slug: "fasadi" },
   { title: "Комоды", slug: "komody" },
   { title: "Кровати", slug: "krovati" },
-  { title: "Плинтусы", slug: "plintusy" }, // ✅ добавили под SALVADOR
+  { title: "Плинтусы", slug: "plintusy" },
   { title: "Полки", slug: "polki" },
   { title: "Шкафы", slug: "shkafy" },
   { title: "Стеллажи", slug: "stellaji" },
   { title: "Столы", slug: "stoli" },
-
-  // ⚠️ сейчас slug = "tumby"
-  // если у AMBER папка/моки "tumbi" — товары AMBER могут "исчезать" при фильтре по категории
   { title: "Тумбы", slug: "tumby" },
-
   { title: "Вешалки", slug: "veshalki" },
   { title: "Витрины", slug: "vitrini" },
   { title: "Зеркала", slug: "zerkala" },
   { title: "Пуфы", slug: "pufi" },
+
+  // комнаты (как товары)
+  { title: "Спальни", slug: "bedrooms" },
+  { title: "Гостиные", slug: "living" },
+  { title: "Молодёжные", slug: "youth" },
 ];
 
-// ✅ список коллекций для /collection/[key]
+// ==============================
+// /collection/[key]
+// ==============================
 export type CollectionItem = { id: string; title: string };
 export const COLLECTION_PRODUCTS: CollectionItem[] = BRANDS.map((b) => ({
   id: b.slug,
   title: b.title,
 }));
 
-// ✅ Единый источник правды для каталога
+// ==============================
+// SECTION SCENES → PRODUCTS
+// ==============================
+const SECTION_SCENE_PRODUCTS: CatalogProduct[] =
+  buildSectionSceneProducts();
+
+// ==============================
+// CATALOG_MOCK (единый источник правды)
+// ==============================
 export const CATALOG_MOCK: CatalogProduct[] = [
+  // модульные товары
   ...SCANDI_PRODUCTS,
   ...SALVADOR_PRODUCTS,
   ...PITTI_PRODUCTS,
@@ -62,11 +87,13 @@ export const CATALOG_MOCK: CatalogProduct[] = [
   ...BUONGIORNO_PRODUCTS,
   ...AMBER_PRODUCTS,
 
-  // 🔻 дальше ты добавляешь новые коллекции так же:
-  // ...NEW_PRODUCTS,
+  // сцены как товары (спальни / гостиные / молодежные)
+  ...SECTION_SCENE_PRODUCTS,
 ];
 
-// ✅ DEV: проверка дублей id (чтобы не ловить "товар из другой коллекции")
+// ==============================
+// DEV: защита от дублей id
+// ==============================
 if (process.env.NODE_ENV !== "production") {
   const seen = new Set<string>();
   const dups: string[] = [];
@@ -83,13 +110,14 @@ if (process.env.NODE_ENV !== "production") {
   }
 }
 
-// ✅ быстрый доступ к товару по id: Map (чтобы работал .get())
-// ⚠️ если id дублируются — Map перезапишет старый товар новым (поэтому выше лог дублей)
+// ==============================
+// Быстрый доступ по id
+// ==============================
 export const CATALOG_BY_ID = new Map<string, CatalogProduct>(
   CATALOG_MOCK.map((p) => [String(p.id), p]),
 );
 
-// ✅ запасной вариант: Object-словарь (если где-то было CATALOG_BY_ID[id])
+// запасной вариант (если где-то был object-доступ)
 export const CATALOG_BY_ID_OBJ = Object.fromEntries(
   CATALOG_MOCK.map((p) => [String(p.id), p]),
 ) as Record<string, CatalogProduct>;

@@ -4,7 +4,8 @@
 import React, { useMemo } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Trash2, ArrowRight, ShoppingBag } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Trash2, ArrowRight, ShoppingBag, ChevronLeft } from "lucide-react";
 
 import { useRegionLang } from "../context/region-lang";
 import { useShopState } from "../context/shop-state";
@@ -67,8 +68,16 @@ type VariantAny = {
 };
 
 export default function CartClient() {
+  const router = useRouter();
   const { region } = useRegionLang(); // "uz" | "ru"
   const shop = useShopState();
+
+  // ✅ Умная "Назад": если истории нет — уводим в каталог
+  const goBack = () => {
+    if (typeof window === "undefined") return;
+    if (window.history.length > 1) router.back();
+    else router.push("/catalog");
+  };
 
   // ✅ keys в cart уже вида productId::variantId
   const keys = useMemo(() => {
@@ -165,7 +174,23 @@ export default function CartClient() {
     <main className="mx-auto w-full max-w-[1200px] px-4 py-10">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <div className="text-[12px] tracking-[0.28em] text-black/45">
+          {/* ✅ Back */}
+          <button
+            type="button"
+            onClick={goBack}
+            className={cn(
+              "cursor-pointer inline-flex items-center gap-2 rounded-full",
+              "border border-black/10 bg-white px-4 py-2 text-sm text-black/70",
+              "hover:text-black hover:border-black/20 transition",
+            )}
+            aria-label="Назад"
+            title="Назад"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Назад
+          </button>
+
+          <div className="mt-4 text-[12px] tracking-[0.28em] text-black/45">
             LIONETO
           </div>
           <h1 className="mt-2 text-3xl font-semibold tracking-[-0.02em]">
@@ -276,6 +301,8 @@ export default function CartClient() {
                           onClick={() =>
                             changeQty(it.productId, it.variantId, it.qty - 1)
                           }
+                          aria-label="Уменьшить количество"
+                          title="Уменьшить"
                         >
                           −
                         </button>
@@ -287,6 +314,8 @@ export default function CartClient() {
                           onClick={() =>
                             changeQty(it.productId, it.variantId, it.qty + 1)
                           }
+                          aria-label="Увеличить количество"
+                          title="Увеличить"
                         >
                           +
                         </button>

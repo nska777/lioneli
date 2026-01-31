@@ -1,9 +1,10 @@
+// app/checkout/CheckoutClient.tsx
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { ArrowRight, CheckCircle2 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight, CheckCircle2, ChevronLeft } from "lucide-react";
 
 import { useRegionLang } from "../context/region-lang";
 import { useShopState } from "../context/shop-state";
@@ -67,11 +68,19 @@ function labelByBrandSlug(slug: string | null | undefined) {
 }
 
 export default function CheckoutClient() {
+  const router = useRouter();
   const sp = useSearchParams();
   const mode = sp.get("mode"); // "oneclick" | null
 
   const { region } = useRegionLang();
   const shop = useShopState();
+
+  // ✅ умная кнопка "назад": back, но если зашли напрямую — в корзину
+  const goBack = () => {
+    if (typeof window === "undefined") return;
+    if (window.history.length > 1) router.back();
+    else router.push("/cart");
+  };
 
   const [phone, setPhone] = useState(region === "uz" ? "+998 " : "+7 ");
   const [name, setName] = useState("");
@@ -162,7 +171,6 @@ export default function CheckoutClient() {
       .map((key) => {
         const k = String(key);
 
-        // ✅ используем parseKey из shop-state (единая логика)
         const { productId, variantId } = shop.parseKey(k);
 
         const p = CATALOG_BY_ID.get(String(productId));
@@ -192,7 +200,6 @@ export default function CheckoutClient() {
         const unit = Number(baseUnit || 0) + Number(delta || 0);
         const variantTitle = variant?.title ? String(variant.title) : null;
 
-        // ✅ коллекция
         const brandSlug = String((p as any).brand ?? "");
         const collectionLabel = labelByBrandSlug(brandSlug);
 
@@ -247,10 +254,7 @@ export default function CheckoutClient() {
         orderId,
         createdAt: new Date().toLocaleString("ru-RU"),
         region,
-
-        // ✅ ВАЖНО: теперь API точно поймёт тип заказа
         mode: mode === "oneclick" ? "oneclick" : "cart",
-
         customer: {
           phone: phone.trim(),
           name: name.trim() || undefined,
@@ -259,11 +263,8 @@ export default function CheckoutClient() {
         },
         items: items.map((it) => ({
           id: it.productId,
-
-          // ✅ коллекция — для TG / админов
           collection: it.collectionSlug || undefined,
           collectionLabel: it.collectionLabel || undefined,
-
           variantId: it.variantId,
           variantTitle: it.variantTitle || undefined,
           qty: it.qty,
@@ -272,8 +273,6 @@ export default function CheckoutClient() {
           title: it.title,
         })),
         total,
-
-        // оставим как было, чтобы ничего не сломать у тебя в будущем
         meta: { mode: mode === "oneclick" ? "oneclick" : "cart" },
       };
 
@@ -290,11 +289,8 @@ export default function CheckoutClient() {
 
       setDoneOrderId(orderId);
 
-      if (mode === "oneclick") {
-        shop.clearOneClick?.();
-      } else {
-        shop.clearCart?.();
-      }
+      if (mode === "oneclick") shop.clearOneClick?.();
+      else shop.clearCart?.();
     } catch (e: any) {
       setError(e?.message || "Ошибка");
     } finally {
@@ -346,6 +342,16 @@ export default function CheckoutClient() {
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-10">
+      {/* ✅ Кнопка назад */}
+      <button
+        type="button"
+        onClick={goBack}
+        className="mb-5 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-black/70 hover:text-black hover:border-black/20 transition cursor-pointer"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Назад
+      </button>
+
       <div>
         <div className="text-[12px] tracking-[0.28em] text-black/45">
           LIONETO
@@ -359,6 +365,7 @@ export default function CheckoutClient() {
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
+        {/* ✅ ТВОЯ ФОРМА КАК БЫЛА */}
         <section className="rounded-3xl border border-black/10 bg-white p-5">
           <div className="text-base font-semibold">Данные клиента</div>
 
@@ -413,6 +420,7 @@ export default function CheckoutClient() {
           )}
         </section>
 
+        {/* summary */}
         <aside className="h-fit rounded-3xl border border-black/10 bg-white p-5">
           <div className="text-base font-semibold">Ваш заказ</div>
 
@@ -424,7 +432,6 @@ export default function CheckoutClient() {
                   className="flex items-start justify-between gap-3"
                 >
                   <div className="min-w-0">
-                    {/* ✅ коллекция + название */}
                     <div className="truncate text-sm font-medium">
                       {it.collectionLabel ? (
                         <span className="text-black/55">

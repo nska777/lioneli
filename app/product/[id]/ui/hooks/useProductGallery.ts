@@ -1,137 +1,159 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { ProductVariant, ProductPageModel } from "../ProductClient";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-function groupKey(v: ProductVariant) {
-  return (v.group || v.kind || "option").toString();
+type ProductLike = {
+  id?: string;
+  image?: string;
+  gallery?: string[];
+};
+
+type UseProductGalleryOpts = {
+  variantGallery?: string[] | null;
+  cacheKey?: string;
+};
+
+function normalize(arr: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of arr) {
+    if (!s || typeof s !== "string") continue;
+    const v = s.trim();
+    if (!v || seen.has(v)) continue;
+    seen.add(v);
+    out.push(v);
+  }
+  return out;
 }
 
-export function useProductGallery({
-  product,
-  groups,
-  selectedVariants,
-  selectedByGroup,
-}: {
-  product: ProductPageModel;
-  groups: Map<string, ProductVariant[]>;
-  selectedVariants: ProductVariant[];
-  selectedByGroup: Record<string, string>;
-}) {
-  // MIN-base: хотим ВСЕГДА 2 фото (01 + 02) в галерее (главная + подслайдер)
-  const sizeGalleryAll = useMemo(() => {
-    const sizeArr = groups.get("size") ?? [];
-    const flat: string[] = [];
-    for (const v of sizeArr) {
-      const g = Array.isArray(v.gallery) ? v.gallery : [];
-      for (const src of g) {
-        const s = String(src || "");
-        if (s && !flat.includes(s)) flat.push(s);
-      }
-    }
-    return flat;
-  }, [groups]);
+function preloadOk(src: string) {
+  return new Promise<boolean>((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = src;
+  });
+}
 
-  const galleryRaw = useMemo(() => {
-    const bySize = selectedVariants.find((v) => groupKey(v) === "size");
-    const byAny = selectedVariants.find((v) => (v.gallery?.length ?? 0) > 0);
+// ✅ небольшой in-memory кэш, чтобы не дёргать картинки повторно
+const galleryCache = new Map<string, string[]>();
 
-    const pick =
-      sizeGalleryAll.length > 1
-        ? sizeGalleryAll
-        : (bySize?.gallery?.filter(Boolean) ?? []).length
-          ? bySize!.gallery!
-          : (byAny?.gallery?.filter(Boolean) ?? []).length
-            ? byAny!.gallery!
-            : Array.isArray(product.gallery)
-              ? product.gallery.filter(Boolean)
-              : [];
-
-    const base = pick.length ? pick : [product.image].filter(Boolean);
-
-    const uniq: string[] = [];
-    for (const src of base.map(String)) {
-      if (src && !uniq.includes(src)) uniq.push(src);
-    }
-
-    for (const v of selectedVariants) {
-      const vi = v.image ? String(v.image) : "";
-      if (vi && !uniq.includes(vi)) uniq.unshift(vi);
-    }
-
-    return uniq.length ? uniq : [product.image].filter(Boolean);
-  }, [product.gallery, product.image, selectedVariants, sizeGalleryAll]);
-
-  const gallery = useMemo(() => {
-    if (product.isCollection) return galleryRaw;
-    return galleryRaw.slice(0, 3);
-  }, [galleryRaw, product.isCollection]);
-
+export function useProductGallery(
+  product?: ProductLike | null,
+  opts?: UseProductGalleryOpts
+) {
   const [activeIdx, setActiveIdx] = useState(0);
 
-  // сброс при смене товара
+  // 1) Источник правды:
+  // variantGallery (если есть) -> product.gallery -> product.image (1 шт) -> []
+  const rawGallery = useMemo(() => {
+    const base =
+      opts?.variantGallery?.length
+        ? opts.variantGallery
+        : product?.gallery?.length
+        ? product.gallery
+        : product?.image
+        ? [product.image]
+        : [];
+
+    return normalize(base);
+  }, [opts?.variantGallery, product?.gallery, product?.image]);
+
+  // 2) cacheKey (важно: можно включать selectedVariantKey снаружи)
+  const cacheKey = useMemo(() => {
+    if (opts?.cacheKey) return opts.cacheKey;
+    if (product?.id) return `p:${product.id}`;
+    if (rawGallery[0]) return `g:${rawGallery[0]}`;
+    return "";
+  }, [opts?.cacheKey, product?.id, rawGallery]);
+
+  // 3) Состояние gallery: не показываем "сырую" пачку, ждём валидацию
+  const [gallery, setGallery] = useState<string[]>(() => {
+    const cached = cacheKey ? galleryCache.get(cacheKey) : undefined;
+    if (cached?.length) return cached;
+
+    if (product?.image) return [product.image];
+    return [];
+  });
+
+  const runIdRef = useRef(0);
+
   useEffect(() => {
-    setActiveIdx(0);
-  }, [product.id]);
+    let cancelled = false;
+    const myRun = ++runIdRef.current;
 
-  // при смене size — показываем нужную фотку
+    // ✅ если есть кэш — мгновенно
+    if (cacheKey) {
+      const cached = galleryCache.get(cacheKey);
+      if (cached?.length) {
+        setGallery(cached);
+        setActiveIdx(0);
+        return;
+      }
+    }
+
+    (async () => {
+      if (!rawGallery.length) {
+        const next = product?.image ? [product.image] : [];
+        if (!cancelled && runIdRef.current === myRun) {
+          setGallery(next);
+          if (cacheKey) galleryCache.set(cacheKey, next);
+          setActiveIdx(0);
+        }
+        return;
+      }
+
+      const checks = await Promise.all(rawGallery.map(preloadOk));
+      const filtered = rawGallery.filter((_, i) => checks[i]);
+
+      if (cancelled) return;
+      if (runIdRef.current !== myRun) return;
+
+      const next =
+        filtered.length > 0
+          ? filtered
+          : product?.image
+          ? [product.image]
+          : [];
+
+      setGallery(next);
+      if (cacheKey) galleryCache.set(cacheKey, next);
+      setActiveIdx(0);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [rawGallery, product?.image, cacheKey]);
+
+  const maxLen = gallery.length;
+
+  // clamp activeIdx
   useEffect(() => {
-    const sizeId = selectedByGroup["size"];
-    const sizeVar = (groups.get("size") ?? []).find(
-      (v) => String(v.id) === String(sizeId),
-    );
-    const target = String(sizeVar?.gallery?.[0] ?? "");
-    if (!target) return;
+    if (maxLen <= 0) {
+      if (activeIdx !== 0) setActiveIdx(0);
+      return;
+    }
+    if (activeIdx > maxLen - 1) setActiveIdx(maxLen - 1);
+    if (activeIdx < 0) setActiveIdx(0);
+  }, [maxLen, activeIdx]);
 
-    const idx = gallery.findIndex((x) => String(x) === target);
-    if (idx >= 0) setActiveIdx(idx);
-  }, [selectedByGroup, groups, gallery]);
+  const onPrev = useCallback(() => {
+    if (maxLen <= 1) return;
+    setActiveIdx((i) => (i - 1 + maxLen) % maxLen);
+  }, [maxLen]);
 
-  // ✅ при смене mechanism — показываем нужную фотку
-  useEffect(() => {
-    const mechId = selectedByGroup["mechanism"];
-    if (!mechId) return;
-
-    const mechVar = (groups.get("mechanism") ?? []).find(
-      (v) => String(v.id) === String(mechId),
-    );
-
-    const target = String(mechVar?.gallery?.[0] ?? "");
-    if (!target) return;
-
-    const idx = gallery.findIndex((x) => String(x) === target);
-    if (idx >= 0) setActiveIdx(idx);
-    else setActiveIdx(0);
-  }, [selectedByGroup, groups, gallery]);
-
-  // ✅ NEW: при смене color — показываем нужную фотку (BUONGIORNO и любые другие)
-  useEffect(() => {
-    const colorId = selectedByGroup["color"];
-    if (!colorId) return;
-
-    const colorVar = (groups.get("color") ?? []).find(
-      (v) => String(v.id) === String(colorId),
-    );
-
-    const target = String(colorVar?.gallery?.[0] ?? "");
-    if (!target) return;
-
-    const idx = gallery.findIndex((x) => String(x) === target);
-    if (idx >= 0) setActiveIdx(idx);
-    else setActiveIdx(0);
-  }, [selectedByGroup, groups, gallery]);
-
-  const maxLen = Math.max(1, gallery.length);
-
-  const nextMain = () => setActiveIdx((v) => (v + 1) % maxLen);
-  const prevMain = () => setActiveIdx((v) => (v - 1 + maxLen) % maxLen);
+  const onNext = useCallback(() => {
+    if (maxLen <= 1) return;
+    setActiveIdx((i) => (i + 1) % maxLen);
+  }, [maxLen]);
 
   return {
     gallery,
     activeIdx,
     setActiveIdx,
-    nextMain,
-    prevMain,
+    onPrev,
+    onNext,
     maxLen,
   };
 }
