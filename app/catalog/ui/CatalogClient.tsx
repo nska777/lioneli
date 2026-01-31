@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import gsap from "gsap";
@@ -15,6 +16,192 @@ import CatalogGrid from "./CatalogGrid";
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
+
+/* =========================
+   HERO SLIDER (STATIC)
+   Включается ТОЛЬКО когда в URL есть hero=1
+   и выбраны menu + collections
+   Картинки — статично из /public/mega/...
+========================= */
+
+function seqImages(baseDir: string, count: number) {
+  // count = общее число фоток в слайдере
+  // формат: main.jpg + 1..(count-1).jpg
+  const out: string[] = [];
+  out.push(`${baseDir}/main.jpg`);
+  for (let i = 1; i <= Math.max(0, count - 1); i++) {
+    out.push(`${baseDir}/${i}.jpg`);
+  }
+  return out;
+}
+
+type HeroSliderCfg = {
+  title: string;
+  images: string[];
+};
+
+// ✅ Правила из твоего сообщения (статично)
+const HERO_SLIDERS: Record<string, HeroSliderCfg> = {
+  // ===== СПАЛЬНИ =====
+  "bedrooms:amber": {
+    title: "Спальня «АМБЕР»",
+    images: seqImages("/mega/bedrooms/amber", 3), // main + 1 + 2
+  },
+  "bedrooms:buongiorno": {
+    title: "Спальня «БОНЖОРНО»",
+    // общий слайдер (белый + капучино вместе) — просто общий набор фоток коллекции
+    images: seqImages("/mega/bedrooms/buongiorno", 3),
+  },
+  "bedrooms:scandi": {
+    title: "Спальня «СКАНДИ»",
+    // общий набор (белый + капучино вместе) — один слайдер
+    images: seqImages("/mega/bedrooms/scandi", 3),
+  },
+  "bedrooms:elizabeth": {
+    title: "Спальня «ЭЛИЗАБЕТ»",
+    images: seqImages("/mega/bedrooms/elizabeth", 2), // 2 фото
+  },
+  "bedrooms:pitti": {
+    title: "Спальня «ПИТТИ»",
+    images: seqImages("/mega/bedrooms/pitti", 10), // 10 фото (нужно добавить 3..9.jpg)
+  },
+  "bedrooms:salvador": {
+    title: "Спальня «САЛЬВАДОР»",
+    images: seqImages("/mega/bedrooms/salvador", 2), // 2 фото
+  },
+
+  // ===== ГОСТИНЫЕ (только эти) =====
+  "living:buongiorno": {
+    title: "Гостиная «BUONGIORNO»",
+    images: seqImages("/mega/living/buongiorno", 3),
+  },
+  "living:pitti": {
+    title: "Гостиная «ПИТТИ»",
+    images: seqImages("/mega/living/pitti", 3),
+  },
+  "living:salvador": {
+    title: "Гостиная «САЛЬВАДОР»",
+    images: seqImages("/mega/living/salvador", 3),
+  },
+  "living:scandi": {
+    title: "Гостиная «СКАНДИ»",
+    images: seqImages("/mega/living/scandi", 3),
+  },
+
+  // ===== МОЛОДЁЖНЫЕ (только эти) =====
+  "youth:elizabeth": {
+    title: "Молодёжная «ЭЛИЗАБЕТ»",
+    images: seqImages("/mega/youth/elizabeth", 3),
+  },
+  "youth:scandi": {
+    title: "Молодёжная «СКАНДИ»",
+    images: seqImages("/mega/youth/scandi", 3),
+  },
+};
+
+function CatalogHero({ title, images }: { title: string; images: string[] }) {
+  const safeImages = useMemo(() => images.filter(Boolean), [images]);
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    setIdx(0);
+  }, [title]);
+
+  const max = safeImages.length;
+
+  const prev = () => setIdx((v) => (max ? (v - 1 + max) % max : 0));
+  const next = () => setIdx((v) => (max ? (v + 1) % max : 0));
+
+  if (!max) return null;
+
+  return (
+    <section className="mb-8">
+      <div
+        className={cn(
+          "rounded-3xl border border-black/10 bg-white",
+          "shadow-[0_35px_110px_-65px_rgba(0,0,0,0.45)]",
+          "overflow-hidden",
+        )}
+      >
+        <div className="px-6 pt-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-[12px] tracking-[0.16em] uppercase text-black/45">
+                Коллекция
+              </div>
+              <h2 className="mt-1 text-[26px] font-medium tracking-[-0.02em]">
+                {title}
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={prev}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-black/70 hover:text-black hover:bg-black/5 transition cursor-pointer"
+                aria-label="Prev"
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                onClick={next}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-black/70 hover:text-black hover:bg-black/5 transition cursor-pointer"
+                aria-label="Next"
+              >
+                ›
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 pb-6 pt-4">
+          <div className="relative overflow-hidden rounded-2xl bg-black/5">
+            <div className="relative aspect-[16/9] w-full">
+              <Image
+                key={safeImages[idx]}
+                src={safeImages[idx]}
+                alt={title}
+                fill
+                priority
+                className="object-cover opacity-0 animate-[fade_.22s_ease-out_forwards]"
+              />
+
+              {/* dots */}
+              <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-2">
+                {safeImages.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setIdx(i)}
+                    className={cn(
+                      "h-2 rounded-full transition cursor-pointer",
+                      i === idx ? "w-8 bg-white/90" : "w-2 bg-white/50",
+                    )}
+                    aria-label={`Slide ${i + 1}`}
+                  />
+                ))}
+              </div>
+
+              {/* counter */}
+              <div className="absolute right-3 top-3 rounded-full bg-white/85 px-3 py-1 text-[11px] tracking-[0.14em] uppercase text-black/70">
+                {idx + 1}/{max}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <style jsx global>{`
+          @keyframes fade {
+            to {
+              opacity: 1;
+            }
+          }
+        `}</style>
+      </div>
+    </section>
+  );
+}
 
 function parseCSV(v: string | null) {
   if (!v) return [];
@@ -183,6 +370,9 @@ export default function CatalogClient({
     return Number(v ?? 0) || 0;
   };
 
+  // ✅ режим витрины (hero сверху + sticky бар)
+  const heroMode = sp.get("hero") === "1";
+
   function pushParams(mutator: (p: URLSearchParams) => void) {
     const params = new URLSearchParams(sp.toString());
     mutator(params);
@@ -344,7 +534,22 @@ export default function CatalogClient({
   }
 
   function resetAll() {
-    router.push("/catalog", { scroll: false });
+    // ✅ обычный /catalog — как и было
+    if (!heroMode) {
+      router.push("/catalog", { scroll: false });
+      return;
+    }
+
+    // ✅ в режиме витрины: сохраняем hero + (menu/collections), чистим остальные
+    pushParams((params) => {
+      const keepMenu = params.get("menu");
+      const keepCol = params.get("collections");
+      params.forEach((_, key) => params.delete(key));
+
+      if (keepMenu) params.set("menu", keepMenu);
+      if (keepCol) params.set("collections", keepCol);
+      params.set("hero", "1");
+    });
   }
 
   const qFromUrl = (sp.get("q") || "").trim();
@@ -392,6 +597,10 @@ export default function CatalogClient({
 
   const facadeItems =
     activeModule === "vitrini" ? VITRINI_FACADE_ITEMS : FACADE_ITEMS;
+
+  // ✅ конфиг для hero (если есть)
+  const heroKey = `${normalizeRoomToken(activeRoom)}:${normalizeCollectionToken(activeCollection)}`;
+  const heroCfg = heroMode ? HERO_SLIDERS[heroKey] : undefined;
 
   const filtered = useMemo(() => {
     const needle = qFromUrl.toLowerCase();
@@ -541,6 +750,11 @@ export default function CatalogClient({
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-10">
+      {/* ✅ HERO MODE: сверху слайдер */}
+      {heroMode && heroCfg ? (
+        <CatalogHero title={heroCfg.title} images={heroCfg.images} />
+      ) : null}
+
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[24px] font-medium tracking-[-0.02em]">
@@ -579,80 +793,103 @@ export default function CatalogClient({
         />
 
         <section>
-          <CatalogTopFilters
-            roomItems={ROOM_ITEMS}
-            brands={BRANDS}
-            moduleItems={MODULE_ITEMS}
-            activeRoom={activeRoom}
-            activeCollection={activeCollection}
-            activeModule={activeModule}
-            onPickRoom={(v) =>
-              setSingleCSVParam(
-                "menu",
-                activeRoom === normalizeRoomToken(v) ? "" : v,
-              )
-            }
-            onPickCollection={(v) =>
-              setSingleCSVParam(
-                "collections",
-                activeCollection === normalizeCollectionToken(v) ? "" : v,
-              )
-            }
-            // ✅ УМНО: если выбрана комната (RoomMode) и ты кликаешь модуль —
-            // мы автоматически выходим из RoomMode (убираем menu) и включаем types
-            onPickModule={(v) => {
-              const next =
-                activeModule === normalizeModuleToken(v) ? "" : String(v ?? "");
-
-              pushParams((params) => {
-                // если выбираем модуль (next не пустой) в режиме комнаты — выходим из комнаты
-                if (isRoomMode && next) {
-                  params.delete("menu");
+          {/* ✅ HERO MODE: фиксируем бар вверху (только в этом режиме) */}
+          <div
+            className={cn(
+              heroMode && "sticky z-30 -mx-4 px-4",
+              heroMode && "top-[116px] md:top-[128px]", // под шапку (примерно как на скринах)
+            )}
+          >
+            <div
+              className={cn(
+                heroMode &&
+                  "rounded-2xl border border-black/10 bg-white/90 backdrop-blur-md shadow-[0_20px_60px_-45px_rgba(0,0,0,0.35)]",
+                heroMode && "py-4",
+              )}
+            >
+              <CatalogTopFilters
+                roomItems={ROOM_ITEMS}
+                brands={BRANDS}
+                moduleItems={MODULE_ITEMS}
+                activeRoom={activeRoom}
+                activeCollection={activeCollection}
+                activeModule={activeModule}
+                onPickRoom={(v) =>
+                  setSingleCSVParam(
+                    "menu",
+                    activeRoom === normalizeRoomToken(v) ? "" : v,
+                  )
                 }
-
-                // применяем types
-                let clean = String(next ?? "").trim();
-                clean = normalizeModuleToken(clean);
-                if (!clean) params.delete("types");
-                else params.set("types", clean);
-
-                // если ушли с "Шкафы" или "Витрины" — подфильтры сбрасываем
-                const m = norm(clean);
-                if (m !== "shkafy" && m !== "vitrini") {
-                  params.delete("doors");
-                  params.delete("facade");
+                onPickCollection={(v) =>
+                  setSingleCSVParam(
+                    "collections",
+                    activeCollection === normalizeCollectionToken(v) ? "" : v,
+                  )
                 }
-              });
-            }}
-            // doors/facade
-            isDoorsFacadeUI={isDoorsFacadeUI}
-            doorsTitle={
-              activeModule === "vitrini"
-                ? "Витрины · Створки"
-                : "Шкафы · Створки"
-            }
-            facadeTitle={
-              activeModule === "vitrini" ? "Витрины · Вид" : "Шкафы · Фасад"
-            }
-            doorItems={DOOR_ITEMS}
-            facadeItems={facadeItems}
-            activeDoor={activeDoor}
-            activeFacade={activeFacade}
-            onPickDoor={(v) =>
-              setSingleParam("doors", activeDoor === v ? "" : v)
-            }
-            onPickFacade={(v) =>
-              setSingleParam("facade", activeFacade === v ? "" : v)
-            }
-            onResetDoorFacade={() =>
-              pushParams((params) => {
-                params.delete("doors");
-                params.delete("facade");
-              })
-            }
-          />
+                // ✅ УМНО: если выбрана комната (RoomMode) и ты кликаешь модуль —
+                // мы автоматически выходим из RoomMode (убираем menu) и включаем types
+                onPickModule={(v) => {
+                  const next =
+                    activeModule === normalizeModuleToken(v)
+                      ? ""
+                      : String(v ?? "");
 
-          <CatalogToolbar q={q} setQ={setQ} sort={sort} setSort={setSort} />
+                  pushParams((params) => {
+                    // если выбираем модуль (next не пустой) в режиме комнаты — выходим из комнаты
+                    if (isRoomMode && next) {
+                      params.delete("menu");
+                    }
+
+                    // применяем types
+                    let clean = String(next ?? "").trim();
+                    clean = normalizeModuleToken(clean);
+                    if (!clean) params.delete("types");
+                    else params.set("types", clean);
+
+                    // если ушли с "Шкафы" или "Витрины" — подфильтры сбрасываем
+                    const m = norm(clean);
+                    if (m !== "shkafy" && m !== "vitrini") {
+                      params.delete("doors");
+                      params.delete("facade");
+                    }
+                  });
+                }}
+                // doors/facade
+                isDoorsFacadeUI={isDoorsFacadeUI}
+                doorsTitle={
+                  activeModule === "vitrini"
+                    ? "Витрины · Створки"
+                    : "Шкафы · Створки"
+                }
+                facadeTitle={
+                  activeModule === "vitrini" ? "Витрины · Вид" : "Шкафы · Фасад"
+                }
+                doorItems={DOOR_ITEMS}
+                facadeItems={facadeItems}
+                activeDoor={activeDoor}
+                activeFacade={activeFacade}
+                onPickDoor={(v) =>
+                  setSingleParam("doors", activeDoor === v ? "" : v)
+                }
+                onPickFacade={(v) =>
+                  setSingleParam("facade", activeFacade === v ? "" : v)
+                }
+                onResetDoorFacade={() =>
+                  pushParams((params) => {
+                    params.delete("doors");
+                    params.delete("facade");
+                  })
+                }
+              />
+
+              <CatalogToolbar q={q} setQ={setQ} sort={sort} setSort={setSort} />
+            </div>
+          </div>
+
+          {/* ✅ обычный режим (без hero) — оставляем как есть: toolbar уже выше не нужен */}
+          {!heroMode ? (
+            <CatalogToolbar q={q} setQ={setQ} sort={sort} setSort={setSort} />
+          ) : null}
 
           <CatalogGrid
             gridRef={gridRef}

@@ -34,31 +34,64 @@ export const topLinks: readonly TopLink[] = [
 ] as const;
 
 /**
- * ✅ единый формат href:
- * /catalog/collection-${brand}-${category}
+ * ✅ Новый единый формат href для "витрины":
+ * /catalog?menu=<menu>&collections=<brand>&hero=1
  *
- * ✅ единый формат id витрины:
- * col-${brand}-${category}
+ * Важно: обычный вход в /catalog (без hero) остаётся как есть (см. topLinks).
  */
-export const makeCollectionHref = (brand: string, category: string) =>
-  `/catalog/collection-${brand}-${category}`;
+const MENU_BY_CATEGORY: Record<string, string> = {
+  bedrooms: "bedrooms",
+  living: "living",
+  youth: "youth",
+};
+
+export const makeCollectionHref = (brand: string, category: string) => {
+  const menu = MENU_BY_CATEGORY[category] ?? category;
+  return `/catalog?menu=${encodeURIComponent(menu)}&collections=${encodeURIComponent(
+    brand,
+  )}&hero=1`;
+};
 
 export const makeCollectionId = (brand: string, category: string) =>
   `col-${brand}-${category}`;
 
-// ожидаем slug: collection-amber-bedrooms
+/**
+ * ✅ Парсинг "витринного" href:
+ * /catalog?menu=bedrooms&collections=amber&hero=1
+ */
+export function parseCollectionHref(href: string) {
+  try {
+    if (!href?.startsWith("/catalog")) return null;
+
+    const qIndex = href.indexOf("?");
+    if (qIndex === -1) return null;
+
+    const search = href.slice(qIndex + 1);
+    const sp = new URLSearchParams(search);
+
+    const brand = sp.get("collections") ?? "";
+    const category = sp.get("menu") ?? "";
+
+    if (!brand || !category) return null;
+
+    return { brand, category };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ✅ Backward compat (если где-то остались старые slugs)
+ * ожидаем slug: collection-amber-bedrooms
+ */
 export function parseCollectionSlug(slug: string) {
   const m = slug?.match(/^collection-([a-z0-9-]+)-([a-z0-9-]+)$/i);
   if (!m) return null;
-  return { brand: m[1], category: m[2] };
-}
 
-// ✅ быстро получить brand/category из href коллекции
-export function parseCollectionHref(href: string) {
-  // "/catalog/collection-amber-bedrooms"
-  const m = href?.match(/^\/catalog\/collection-([a-z0-9-]+)-([a-z0-9-]+)$/i);
-  if (!m) return null;
-  return { brand: m[1], category: m[2] };
+  // category из slug -> menu
+  const category = MENU_BY_CATEGORY[m[2]] ?? m[2];
+
+  return { brand: m[1], category };
 }
 
 export const megaCategories: MegaCategory[] = [
@@ -68,12 +101,36 @@ export const megaCategories: MegaCategory[] = [
     fallback: "СПАЛЬНИ",
     href: "/category/bedrooms",
     items: [
-      { labelKey: "brand.amber", fallback: "АМБЕР", href: makeCollectionHref("amber", "bedrooms") },
-      { labelKey: "brand.scandi", fallback: "СКАНДИ", href: makeCollectionHref("scandi", "bedrooms") },
-      { labelKey: "brand.elizabeth", fallback: "ЭЛИЗАБЕТ", href: makeCollectionHref("elizabeth", "bedrooms") },
-      { labelKey: "brand.salvador", fallback: "САЛЬВАДОР", href: makeCollectionHref("salvador", "bedrooms") },
-      { labelKey: "brand.pitti", fallback: "ПИТТИ", href: makeCollectionHref("pitti", "bedrooms") },
-      { labelKey: "brand.buongiorno", fallback: "БОНЖОРНО", href: makeCollectionHref("buongiorno", "bedrooms") },
+      {
+        labelKey: "brand.amber",
+        fallback: "АМБЕР",
+        href: makeCollectionHref("amber", "bedrooms"),
+      },
+      {
+        labelKey: "brand.scandi",
+        fallback: "СКАНДИ",
+        href: makeCollectionHref("scandi", "bedrooms"),
+      },
+      {
+        labelKey: "brand.elizabeth",
+        fallback: "ЭЛИЗАБЕТ",
+        href: makeCollectionHref("elizabeth", "bedrooms"),
+      },
+      {
+        labelKey: "brand.salvador",
+        fallback: "САЛЬВАДОР",
+        href: makeCollectionHref("salvador", "bedrooms"),
+      },
+      {
+        labelKey: "brand.pitti",
+        fallback: "ПИТТИ",
+        href: makeCollectionHref("pitti", "bedrooms"),
+      },
+      {
+        labelKey: "brand.buongiorno",
+        fallback: "БОНЖОРНО",
+        href: makeCollectionHref("buongiorno", "bedrooms"),
+      },
     ],
   },
   {
@@ -82,10 +139,26 @@ export const megaCategories: MegaCategory[] = [
     fallback: "ГОСТИНЫЕ",
     href: "/category/living",
     items: [
-      { labelKey: "brand.scandi", fallback: "СКАНДИ", href: makeCollectionHref("scandi", "living") },
-      { labelKey: "brand.pitti_alt", fallback: "ПАТТИ", href: makeCollectionHref("pitti", "living") },
-      { labelKey: "brand.salvador", fallback: "САЛЬВАДОР", href: makeCollectionHref("salvador", "living") },
-      { labelKey: "brand.bergen_white", fallback: "BERGEN WHITE", href: makeCollectionHref("buongiorno", "living") },
+      {
+        labelKey: "brand.scandi",
+        fallback: "СКАНДИ",
+        href: makeCollectionHref("scandi", "living"),
+      },
+      {
+        labelKey: "brand.pitti_alt",
+        fallback: "ПАТТИ",
+        href: makeCollectionHref("pitti", "living"),
+      },
+      {
+        labelKey: "brand.salvador",
+        fallback: "САЛЬВАДОР",
+        href: makeCollectionHref("salvador", "living"),
+      },
+      {
+        labelKey: "brand.bergen_white",
+        fallback: "BERGEN WHITE",
+        href: makeCollectionHref("buongiorno", "living"),
+      },
     ],
   },
   {
@@ -94,7 +167,11 @@ export const megaCategories: MegaCategory[] = [
     fallback: "ПРИХОЖИЕ",
     href: "/category/hallway",
     items: [
-      { labelKey: "common.inDev", fallback: "В РАЗРАБОТКЕ", href: "/category/hallway" },
+      {
+        labelKey: "common.inDev",
+        fallback: "В РАЗРАБОТКЕ",
+        href: "/category/hallway",
+      },
     ],
   },
   {
@@ -103,7 +180,11 @@ export const megaCategories: MegaCategory[] = [
     fallback: "СТОЛЫ И СТУЛЬЯ",
     href: "/category/tables",
     items: [
-      { labelKey: "common.inDev", fallback: "В РАЗРАБОТКЕ", href: "/category/tables" },
+      {
+        labelKey: "common.inDev",
+        fallback: "В РАЗРАБОТКЕ",
+        href: "/category/tables",
+      },
     ],
   },
   {
@@ -112,12 +193,19 @@ export const megaCategories: MegaCategory[] = [
     fallback: "МОЛОДЕЖНЫЕ",
     href: "/category/youth",
     items: [
-      { labelKey: "brand.scandi", fallback: "СКАНДИ", href: makeCollectionHref("scandi", "youth") },
-      { labelKey: "brand.elizabeth", fallback: "ЭЛИЗАБЕТ", href: makeCollectionHref("elizabeth", "youth") },
+      {
+        labelKey: "brand.scandi",
+        fallback: "СКАНДИ",
+        href: makeCollectionHref("scandi", "youth"),
+      },
+      {
+        labelKey: "brand.elizabeth",
+        fallback: "ЭЛИЗАБЕТ",
+        href: makeCollectionHref("elizabeth", "youth"),
+      },
     ],
   },
 ];
-
 
 /* =========================
    MEGA MENU PREVIEWS (1 big + 2 small)
