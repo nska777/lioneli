@@ -36,13 +36,20 @@ type BestPriceUIItem = {
   title: string;
   href: string;
   image: string;
+
   price_rub: number;
   price_uzs: number;
+
   old_price_rub?: number | null;
   old_price_uzs?: number | null;
+
   discountPercent?: number | null;
+
   badge: string; // “Лучшая цена”
   skuLabel?: string | null;
+
+  // ✅ как в BestSellers (Хит продаж): 1 строка капсом, без "• cat"
+  brandLine?: string | null;
 };
 
 function calcOldFromDiscount(price: number, discountPercent?: number | null) {
@@ -51,6 +58,58 @@ function calcOldFromDiscount(price: number, discountPercent?: number | null) {
   const old = price / (1 - d);
   if (!isFinite(old)) return null;
   return Math.round(old);
+}
+
+function safeNumber(v: any) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// ✅ стабильно в рамках сессии, но рандом на новый заход (как BestSellers)
+function getSessionPick(key: string): string[] | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map(String);
+  } catch {
+    return null;
+  }
+}
+function setSessionPick(key: string, ids: string[]) {
+  try {
+    sessionStorage.setItem(key, JSON.stringify(ids));
+  } catch {}
+}
+
+function shuffle<T>(arr: T[], seed: number) {
+  const a = [...arr];
+  let s = seed >>> 0;
+  const rnd = () => {
+    s ^= s << 13;
+    s ^= s >>> 17;
+    s ^= s << 5;
+    return (s >>> 0) / 4294967296;
+  };
+
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function toCapsLabel(v?: string | null) {
+  const s = (v ?? "").trim();
+  if (!s) return null;
+
+  const low = s.toLowerCase();
+  // алиасы как у тебя
+  if (low === "scandi") return "SCANDY";
+  if (low === "skandy") return "SCANDY";
+
+  return s.toUpperCase();
 }
 
 export default function BestPrice({
@@ -80,15 +139,39 @@ export default function BestPrice({
       return b.includes("лучшая") || b.includes("best");
     };
 
+    const need = Math.min(10, all.length);
     const best = all.filter(isBest);
-    const need = 10;
-
     const used = new Set(best.map((p: any) => String(p.id)));
     const extra = all.filter((p: any) => !used.has(String(p.id)));
 
-    const src = [...best, ...extra].slice(0, Math.min(need, all.length));
+    const sessionKey = "lioneto_bestprice_pick_v2";
+    let pickedIds: string[] | null = null;
 
-    return src.map((p: any, idx: number) => {
+    if (typeof window !== "undefined") {
+      pickedIds = getSessionPick(sessionKey);
+      if (!pickedIds) {
+        const seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
+        const bestShuffled = shuffle(
+          best.map((p: any) => String(p.id)),
+          seed,
+        );
+        const extraShuffled = shuffle(
+          extra.map((p: any) => String(p.id)),
+          seed ^ 0x9e3779b9,
+        );
+
+        const ids = [...bestShuffled, ...extraShuffled].slice(0, need);
+        setSessionPick(sessionKey, ids);
+        pickedIds = ids;
+      }
+    }
+
+    const byId = new Map(all.map((p: any) => [String(p.id), p]));
+    const picked =
+      pickedIds?.map((id) => byId.get(String(id))).filter(Boolean) ??
+      [...best, ...extra].slice(0, need);
+
+    return picked.map((p: any, idx: number) => {
       const discountPercent =
         typeof p.discountPercent === "number"
           ? p.discountPercent
@@ -98,18 +181,33 @@ export default function BestPrice({
               ? 35
               : null;
 
+      const price_rub = safeNumber(p.price_rub ?? p.priceRUB ?? 0);
+      const price_uzs = safeNumber(p.price_uzs ?? p.priceUZS ?? 0);
+
+      // ✅ как в Хит продаж: показываем ОДНУ строку (collection если есть, иначе brand)
+      const line =
+        toCapsLabel(p.collection ?? null) ||
+        toCapsLabel(p.brand ?? null) ||
+        null;
+
       return {
         id: String(p.id),
-        title: p.title,
+        title: String(p.title ?? ""),
         href: `/product/${p.id}`,
-        image: p.image,
-        price_rub: Number(p.price_rub ?? 0),
-        price_uzs: Number(p.price_uzs ?? 0),
-        old_price_rub: (p as any).old_price_rub ?? null,
-        old_price_uzs: (p as any).old_price_uzs ?? null,
+        image: String(p.image ?? ""),
+
+        price_rub,
+        price_uzs,
+
+        old_price_rub:
+          (p as any).old_price_rub ?? (p as any).oldPriceRUB ?? null,
+        old_price_uzs:
+          (p as any).old_price_uzs ?? (p as any).oldPriceUZS ?? null,
+
         discountPercent,
         badge: "Лучшая цена",
         skuLabel: p.sku ? String(p.sku) : `ID: ${p.id}`,
+        brandLine: line,
       };
     });
   }, []);
@@ -140,7 +238,7 @@ export default function BestPrice({
     ) as HTMLElement | null;
     if (!card) return;
 
-    const gap = 24;
+    const gap = 24; // как у Хит продаж (визуально)
     const cw = card.getBoundingClientRect().width;
     const perView =
       window.innerWidth >= 1024 ? 3 : window.innerWidth >= 768 ? 2 : 1;
@@ -417,12 +515,12 @@ export default function BestPrice({
                     className={cn(
                       "flex flex-col h-full",
                       "border border-black/10 bg-white",
-                      "rounded-t-[22px] rounded-b-[14px]",
+                      "rounded-[22px]",
                       "shadow-[0_10px_30px_rgba(0,0,0,0.08)]",
                       "transition",
                     )}
                   >
-                    <div className="relative overflow-hidden rounded-t-[22px]">
+                    <div className="relative overflow-hidden rounded-[22px]">
                       {/* badge */}
                       <div className="absolute left-2 top-2 z-10">
                         <span
@@ -436,6 +534,11 @@ export default function BestPrice({
                           )}
                         >
                           {p.badge}
+                          {p.discountPercent ? (
+                            <span className="ml-2 text-emerald-700/80">
+                              −{p.discountPercent}%
+                            </span>
+                          ) : null}
                         </span>
                       </div>
 
@@ -457,21 +560,14 @@ export default function BestPrice({
                         />
                       </div>
 
-                      {/* image */}
-                      <div className="relative aspect-[4/3] bg-black/[0.02] flex-shrink-0">
+                      {/* ✅ image — как в Хит продаж: чисто, без внутреннего серого фона */}
+                      <div className="relative aspect-[4/3] bg-white">
                         <Image
                           src={p.image}
                           alt={p.title}
                           fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                          className="object-contain transition-transform duration-500 group-hover:scale-[1.03]"
                           priority={idx < 6}
-                        />
-                        <div
-                          className="pointer-events-none absolute inset-x-0 bottom-0 h-20"
-                          style={{
-                            background:
-                              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.88) 100%)",
-                          }}
                         />
                       </div>
                     </div>
@@ -480,7 +576,7 @@ export default function BestPrice({
                     <div className="px-5 pt-4 pb-5 flex flex-col justify-between min-h-[148px]">
                       <div>
                         <div className="flex items-baseline gap-3">
-                          <div className="text-[20px] font-semibold tracking-[-0.01em] text-black">
+                          <div className="text-[18px] font-semibold tracking-[-0.01em] text-black">
                             {formatPrice(price, currency)}
                           </div>
                           {old ? (
@@ -490,12 +586,17 @@ export default function BestPrice({
                           ) : null}
                         </div>
 
-                        <div className="mt-2 text-[14px] leading-snug text-black/70 line-clamp-2">
+                        <div className="mt-2 text-[13px] leading-snug text-black/70 line-clamp-2">
                           {p.title}
+                        </div>
+
+                        {/* ✅ как в Хит продаж: просто строка капсом, без пилюли */}
+                        <div className="mt-3 text-[10px] tracking-[0.18em] text-black/40">
+                          {p.brandLine ?? "—"}
                         </div>
                       </div>
 
-                      {/* ✅ визуально убрано */}
+                      {/* ✅ как у тебя было: “визуально убрано” (оставим) */}
                       <div className="mt-2 text-[12px] text-transparent">—</div>
                     </div>
                   </div>

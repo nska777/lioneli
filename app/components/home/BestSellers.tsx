@@ -31,15 +31,54 @@ function formatPrice(value: number, currency: "RUB" | "UZS") {
   }
 }
 
+// -------------------------
+// shuffle (seeded)
+// -------------------------
+function mulberry32(seed: number) {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function shuffleSeeded<T>(arr: T[], seed: number) {
+  const a = arr.slice();
+  const rnd = mulberry32(seed);
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ✅ каждый заход/перезагрузка — новый набор
+function getSeedEveryLoad() {
+  return Math.floor(Math.random() * 2_147_483_647) + 1;
+}
+
+// ✅ алиасы брендов для UI
+function mapBrandLabel(brand: string) {
+  const b = brand.trim().toLowerCase();
+  if (b === "scandi") return "SCANDY"; // костыль: scandi -> scandy
+  return b ? b.toUpperCase() : "";
+}
+
 type HitUIItem = {
   id: string;
   title: string;
   href: string;
   image: string;
+
+  // ❗️цены НЕ трогаем (как просил)
   price_rub: number;
   price_uzs: number;
+
   badge: string; // ✅ всегда “Хит продаж”
-  skuLabel?: string; // если хочешь оставить, можно не показывать
+  skuLabel?: string;
+
+  // ✅ премиальный нижний лейбл
+  brandLabel?: string;
 };
 
 export default function BestSellers({
@@ -61,33 +100,38 @@ export default function BestSellers({
     return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   }, []);
 
-  // ✅ гарантируем, что слайдер всегда работает (>= 12)
+  // ✅ Абсолютный рандом: каждый заход новый (seed каждый mount)
+  // ✅ внутри одного захода — не прыгает
   const list = useMemo<HitUIItem[]>(() => {
     const all = (CATALOG_MOCK ?? []) as any[];
+    if (!all.length) return [];
 
-    const isHit = (p: any) => {
-      const b = String(p.badge || "").toLowerCase();
-      return b.includes("хит") || b.includes("bestseller");
-    };
+    const seed = getSeedEveryLoad();
+    const shuffled = shuffleSeeded(all, seed);
+    const picked = shuffled.slice(0, Math.min(12, shuffled.length));
 
-    const hits = all.filter(isHit);
-    const need = 12;
+    return picked.map((p: any) => {
+      const brandRaw = String(p.brand ?? "")
+        .replace(/[-_]+/g, " ")
+        .trim();
+      const brandLabel = mapBrandLabel(brandRaw) || undefined;
 
-    const used = new Set(hits.map((p: any) => String(p.id)));
-    const extra = all.filter((p: any) => !used.has(String(p.id)));
+      return {
+        id: String(p.id),
+        title: p.title,
+        href: `/product/${p.id}`,
+        image: p.image,
 
-    const merged = [...hits, ...extra].slice(0, Math.min(need, all.length));
+        // ❗️цены НЕ трогаю
+        price_rub: Number(p.price_rub ?? 0),
+        price_uzs: Number(p.price_uzs ?? 0),
 
-    return merged.map((p: any) => ({
-      id: String(p.id),
-      title: p.title,
-      href: `/product/${p.id}`,
-      image: p.image,
-      price_rub: Number(p.price_rub ?? 0),
-      price_uzs: Number(p.price_uzs ?? 0),
-      badge: "Хит продаж", // ✅ ВЕЗДЕ
-      skuLabel: `ID: ${p.id}`,
-    }));
+        badge: "Хит продаж",
+        skuLabel: `ID: ${p.id}`,
+
+        brandLabel,
+      };
+    });
   }, []);
 
   // ✅ pages
@@ -328,7 +372,7 @@ export default function BestSellers({
               className={cn(
                 "h-10 w-10 rounded-full grid place-items-center",
                 "border border-black/10 bg-white",
-                "shadow-[0_10px_30px_rgba(0,0,0,0.08)]",
+                "shadow-[0_12px_34px_rgba(0,0,0,0.10)]",
                 "transition cursor-pointer",
                 page === 0
                   ? "opacity-40 cursor-default"
@@ -345,7 +389,7 @@ export default function BestSellers({
               className={cn(
                 "h-10 w-10 rounded-full grid place-items-center",
                 "border border-black/10 bg-white",
-                "shadow-[0_10px_30px_rgba(0,0,0,0.08)]",
+                "shadow-[0_12px_34px_rgba(0,0,0,0.10)]",
                 "transition cursor-pointer",
                 page >= pages - 1
                   ? "opacity-40 cursor-default"
@@ -371,7 +415,6 @@ export default function BestSellers({
             {list.map((p, idx) => {
               const value = currency === "RUB" ? p.price_rub : p.price_uzs;
 
-              // ✅ snapshot для wishlist
               const snapshot = {
                 title: p.title,
                 href: p.href,
@@ -393,34 +436,68 @@ export default function BestSellers({
                 >
                   <div
                     className={cn(
-                      "flex flex-col h-full",
+                      "relative flex flex-col h-full",
+                      "rounded-[22px]",
                       "border border-black/10 bg-white",
-                      "rounded-t-[22px] rounded-b-[14px]",
-                      "shadow-[0_10px_30px_rgba(0,0,0,0.08)]",
-                      "transition",
+                      "shadow-[0_14px_40px_rgba(0,0,0,0.07)]",
+                      "transition-transform duration-300",
+                      "group-hover:-translate-y-[2px]",
+                      "group-hover:shadow-[0_20px_60px_rgba(0,0,0,0.10)]",
                     )}
                   >
-                    <div className="relative overflow-hidden rounded-t-[22px]">
-                      {/* ✅ badge — всегда */}
-                      <div className="absolute left-2 top-2 z-10">
-                        <span
-                          className={cn(
-                            "inline-flex items-center",
-                            "h-7 px-3 rounded-[12px]",
-                            "bg-white/88 backdrop-blur-xl",
-                            "border border-amber-400/70",
-                            "text-[12px] font-medium text-amber-700",
-                            "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
-                          )}
-                        >
-                          {p.badge}
+                    {/* image */}
+                    <div className="relative overflow-hidden rounded-t-[22px] bg-white">
+                      {/* badge */}
+                      <div className="absolute left-3 top-3 z-10">
+                        <span className="relative inline-flex items-center h-7 px-3 rounded-[12px] overflow-hidden">
+                          {/* radial gold base */}
+                          <span
+                            className="absolute inset-0 rounded-[12px]"
+                            style={{
+                              background:
+                                "radial-gradient(120% 140% at 30% 20%, #FFF1B8 0%, #FFD36A 35%, #E6A93C 65%, #C98A1A 100%)",
+                            }}
+                          />
+
+                          {/* inner gloss */}
+                          <span
+                            className="absolute inset-[1px] rounded-[11px]"
+                            style={{
+                              background:
+                                "linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.12))",
+                            }}
+                          />
+
+                          {/* gold edge */}
+                          <span
+                            className="absolute inset-0 rounded-[12px]"
+                            style={{
+                              boxShadow:
+                                "0 0 0 1px rgba(255,215,130,0.85), 0 10px 28px rgba(201,138,26,0.35)",
+                            }}
+                          />
+
+                          {/* subtle shine on hover */}
+                          <span
+                            className="pointer-events-none absolute -left-[60%] top-0 h-full w-[60%] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+                            style={{
+                              background:
+                                "linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.65) 50%, transparent 100%)",
+                              transform: "skewX(-20deg)",
+                            }}
+                          />
+
+                          {/* text */}
+                          <span className="relative z-10 text-[12px] font-semibold tracking-[0.04em] text-[#5A3A00]">
+                            {p.badge}
+                          </span>
                         </span>
                       </div>
 
-                      {/* ✅ actions via ProductActions */}
+                      {/* actions */}
                       <div
                         data-actions
-                        className="absolute right-2 top-2 z-10"
+                        className="absolute right-3 top-3 z-10"
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
@@ -435,38 +512,53 @@ export default function BestSellers({
                         />
                       </div>
 
-                      <div className="relative aspect-[4/3] bg-black/[0.02] flex-shrink-0">
+                      <div
+                        className={cn(
+                          "relative aspect-[4/3] bg-white",
+                          "px-3 py-3",
+                        )}
+                      >
                         <Image
                           src={p.image}
                           alt={p.title}
                           fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                          className={cn(
+                            "object-contain object-center",
+                            "transition-transform duration-500",
+                            "group-hover:scale-[1.03]",
+                          )}
                           priority={idx < 6}
                         />
-                        <div
-                          className="pointer-events-none absolute inset-x-0 bottom-0 h-20"
-                          style={{
-                            background:
-                              "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.88) 100%)",
-                          }}
-                        />
                       </div>
                     </div>
 
-                    <div className="px-5 pt-4 pb-5 flex flex-col justify-between min-h-[148px]">
-                      <div>
-                        <div className="text-[20px] font-semibold tracking-[-0.01em] text-black">
-                          {formatPrice(value, currency)}
-                        </div>
-
-                        <div className="mt-2 text-[14px] leading-snug text-black/70 line-clamp-2">
-                          {p.title}
-                        </div>
+                    {/* content */}
+                    <div className="px-5 pt-3 pb-4">
+                      <div className="text-[20px] font-semibold tracking-[-0.01em] text-black">
+                        {formatPrice(value, currency)}
                       </div>
 
-                      {/* ✅ визуально убрано ID (как ты хотел позже) */}
-                      <div className="mt-2 text-[12px] text-transparent">—</div>
+                      <div className="mt-1.5 text-[14px] leading-snug text-black/70 line-clamp-2">
+                        {p.title}
+                      </div>
+
+                      {/* ✅ премиальный лейбл бренда/коллекции */}
+                      {p.brandLabel ? (
+                        <div className="mt-2 text-[11px] tracking-[0.18em] uppercase text-black/45">
+                          {p.brandLabel}
+                        </div>
+                      ) : (
+                        <div className="mt-2 h-[14px]" />
+                      )}
                     </div>
+
+                    {/* subtle inner highlight */}
+                    <div
+                      className="pointer-events-none absolute inset-0 rounded-[22px]"
+                      style={{
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+                      }}
+                    />
                   </div>
                 </Link>
               );

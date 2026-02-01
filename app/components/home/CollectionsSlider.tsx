@@ -2,9 +2,14 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+
+import { useRegionLang } from "@/app/context/region-lang";
+import { CATALOG_MOCK } from "@/app/lib/mock/catalog-products";
+import { COLLECTIONS_HOTSPOTS } from "@/app/lib/mock/collections-hotspots";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -15,12 +20,23 @@ type StrapiImage = {
   height?: number | null;
 };
 
+type Hotspot = {
+  id: string;
+  productId: string; // id из CATALOG_MOCK
+  xPct: number; // 0..100
+  yPct: number; // 0..100
+  side?: "left" | "right"; // опционально
+};
+
 export type CollectionItem = {
   id: string | number;
   title: string;
   description?: string;
   images: StrapiImage[];
   href?: string;
+
+  // ✅ точки по фото: ключ = индекс картинки (activeImage)
+  hotspots?: Record<number, Hotspot[]>;
 };
 
 const cn = (...s: Array<string | false | null | undefined>) =>
@@ -48,16 +64,36 @@ function resolveSrc(url?: string) {
   return url.startsWith("/") ? url : `/${url}`;
 }
 
+function formatPrice(value: number, currency: "RUB" | "UZS") {
+  try {
+    const locale = currency === "RUB" ? "ru-RU" : "uz-UZ";
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    return currency === "RUB"
+      ? `${Math.round(value).toLocaleString("ru-RU")} ₽`
+      : `${Math.round(value).toLocaleString("ru-RU")} сум`;
+  }
+}
+
+/**
+ * ✅ Пример точек: AMBER, 1-я фотка (index 0)
+ * Подставь свои productId если отличаются.
+ */
+
 export default function CollectionsSlider({
   collections,
-  autoplayMs = 7500, // коллекции
-  imageAutoplayMs = 2600, // фотки внутри коллекции
 }: {
   collections: CollectionItem[];
-  autoplayMs?: number;
-  imageAutoplayMs?: number;
 }) {
+  const { region } = useRegionLang();
+  const currency: "RUB" | "UZS" = region === "ru" ? "RUB" : "UZS";
+
   const rootRef = useRef<HTMLElement | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   const safeCollections = useMemo(
     () => (collections || []).filter((c) => c?.images?.length),
@@ -68,13 +104,15 @@ export default function CollectionsSlider({
   const [activeImage, setActiveImage] = useState(0);
 
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [hoverPause, setHoverPause] = useState(false);
+
+  // ✅ состояние открытой точки
+  const [openHotspotId, setOpenHotspotId] = useState<string | null>(null);
 
   // manual hold timer refs (чтобы не залипало)
   const manualHoldRef = useRef(false);
   const holdTimeoutRef = useRef<number | null>(null);
 
-  const holdFor = (ms = 4000) => {
+  const holdFor = (ms = 2500) => {
     manualHoldRef.current = true;
     if (holdTimeoutRef.current) window.clearTimeout(holdTimeoutRef.current);
     holdTimeoutRef.current = window.setTimeout(() => {
@@ -83,9 +121,30 @@ export default function CollectionsSlider({
     }, ms);
   };
 
+  const productById = useMemo(() => {
+    const map = new Map<string, any>();
+    (CATALOG_MOCK ?? []).forEach((p: any) => map.set(String(p.id), p));
+    return map;
+  }, []);
+
   const current = safeCollections[activeCollection];
   const currentImages = current?.images || [];
   const currentImg = currentImages[activeImage];
+
+  const hotspots: Hotspot[] = useMemo(() => {
+    const key = String(current?.id);
+    if (!key) return [];
+
+    return COLLECTIONS_HOTSPOTS[key]?.[activeImage] ?? [];
+  }, [current?.id, activeImage]);
+
+  const activeHotspot = openHotspotId
+    ? hotspots.find((h) => h.id === openHotspotId) || null
+    : null;
+
+  const activeProduct = activeHotspot
+    ? productById.get(String(activeHotspot.productId))
+    : null;
 
   // Reveal лёгкий
   useLayoutEffect(() => {
@@ -116,44 +175,46 @@ export default function CollectionsSlider({
     return () => ctx.revert();
   }, []);
 
-  // смена коллекции -> сброс фото
+  // смена коллекции -> сброс фото и закрытие хотспота
   useEffect(() => {
     setActiveImage(0);
+    setOpenHotspotId(null);
   }, [activeCollection]);
 
-  // ✅ Autoplay collections (устойчивый)
+  // смена фото -> закрыть хотспот
   useEffect(() => {
-    if (!autoplayMs) return;
-    if (safeCollections.length <= 1) return;
+    setOpenHotspotId(null);
+  }, [activeImage]);
 
-    const tick = () => {
-      if (hoverPause || lightboxOpen || manualHoldRef.current) return;
-      setActiveCollection((p) => clampIndex(p + 1, safeCollections.length));
-    };
-
-    const id = window.setInterval(tick, autoplayMs);
-    return () => window.clearInterval(id);
-  }, [autoplayMs, safeCollections.length, hoverPause, lightboxOpen]);
-
-  // ✅ Autoplay images (устойчивый)
+  // ✅ анимация карточки хотспота
   useEffect(() => {
-    if (!imageAutoplayMs) return;
-    if (currentImages.length <= 1) return;
+    if (!openHotspotId) return;
+    if (!cardRef.current) return;
 
-    const tick = () => {
-      if (hoverPause || lightboxOpen || manualHoldRef.current) return;
-      setActiveImage((p) => clampIndex(p + 1, currentImages.length));
-    };
+    gsap.fromTo(
+      cardRef.current,
+      { autoAlpha: 0, y: 10, filter: "blur(10px)", scale: 0.98 },
+      {
+        autoAlpha: 1,
+        y: 0,
+        filter: "blur(0px)",
+        scale: 1,
+        duration: 0.26,
+        ease: "power3.out",
+      },
+    );
+  }, [openHotspotId]);
 
-    const id = window.setInterval(tick, imageAutoplayMs);
-    return () => window.clearInterval(id);
-  }, [imageAutoplayMs, currentImages.length, hoverPause, lightboxOpen]);
-
-  // Keyboard for lightbox
+  // Keyboard: Esc + arrows for lightbox
   useEffect(() => {
-    if (!lightboxOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setLightboxOpen(false);
+      if (e.key === "Escape") {
+        if (openHotspotId) setOpenHotspotId(null);
+        if (lightboxOpen) setLightboxOpen(false);
+      }
+
+      if (!lightboxOpen) return;
+
       if (e.key === "ArrowRight") {
         holdFor(2500);
         setActiveImage((p) => clampIndex(p + 1, currentImages.length));
@@ -163,9 +224,31 @@ export default function CollectionsSlider({
         setActiveImage((p) => clampIndex(p - 1, currentImages.length));
       }
     };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [lightboxOpen, currentImages.length]);
+  }, [lightboxOpen, currentImages.length, openHotspotId]);
+
+  // ✅ закрытие хотспот-карточки кликом вне
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      if (!openHotspotId) return;
+
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // клик по точке — пусть обработает сама точка
+      if (target.closest?.("[data-hotspot]")) return;
+
+      // клик внутри карточки — не закрываем
+      if (cardRef.current && cardRef.current.contains(target)) return;
+
+      setOpenHotspotId(null);
+    };
+
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [openHotspotId]);
 
   // cleanup hold timeout
   useEffect(() => {
@@ -186,203 +269,395 @@ export default function CollectionsSlider({
   };
 
   const goPrevImage = () => {
-    holdFor(3500);
+    holdFor();
     setActiveImage((p) => clampIndex(p - 1, currentImages.length));
   };
   const goNextImage = () => {
-    holdFor(3500);
+    holdFor();
     setActiveImage((p) => clampIndex(p + 1, currentImages.length));
   };
+
+  // ✅ позиционирование карточки: авто влево/вправо по x
+  const computedSide: "left" | "right" =
+    activeHotspot?.side ??
+    (activeHotspot && activeHotspot.xPct > 58 ? "left" : "right");
+
+  const activePriceRaw =
+    activeProduct &&
+    Number(
+      currency === "RUB"
+        ? (activeProduct.priceRUB ?? activeProduct.price_rub ?? 0)
+        : (activeProduct.priceUZS ?? activeProduct.price_uzs ?? 0),
+    );
 
   return (
     <section
       ref={rootRef}
-      className="mx-auto w-full max-w-[1200px] px-4 pb-10 pt-10 md:pb-14 md:pt-14"
+      className="w-full px-0 pb-10 pt-10 md:pb-14 md:pt-14"
       aria-label="Коллекции"
-      onMouseEnter={() => setHoverPause(true)}
-      onMouseLeave={() => setHoverPause(false)}
     >
-      {/* Header */}
-      <div className="flex items-start justify-between gap-6">
-        <div>
-          <div className="text-[11px] tracking-[0.22em] text-black/45">
-            LIONETO • COLLECTIONS
+      <div className="mx-auto w-full max-w-[1200px] px-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <div className="text-[11px] tracking-[0.22em] text-black/45">
+              LIONETO • COLLECTIONS
+            </div>
+            <h2
+              data-col-title
+              className="mt-2 text-[28px] font-semibold leading-[1.06] tracking-[-0.02em] text-black md:text-[40px]"
+            >
+              Коллекции
+            </h2>
           </div>
-          <h2
-            data-col-title
-            className="mt-2 text-[28px] font-semibold leading-[1.06] tracking-[-0.02em] text-black md:text-[40px]"
-          >
-            Коллекции
-          </h2>
+
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Предыдущая коллекция"
+              onClick={goPrevCollection}
+              className={cn(
+                "grid h-10 w-10 place-items-center rounded-full",
+                "border border-black/10 bg-white",
+                "shadow-[0_10px_28px_rgba(0,0,0,0.06)]",
+                "transition hover:-translate-y-[1px] hover:shadow-[0_14px_36px_rgba(0,0,0,0.08)]",
+                "active:translate-y-0",
+              )}
+              style={{ cursor: "pointer" }}
+            >
+              <ChevronLeft className="h-5 w-5 text-black/70" />
+            </button>
+            <button
+              type="button"
+              aria-label="Следующая коллекция"
+              onClick={goNextCollection}
+              className={cn(
+                "grid h-10 w-10 place-items-center rounded-full",
+                "border border-black/10 bg-white",
+                "shadow-[0_10px_28px_rgba(0,0,0,0.06)]",
+                "transition hover:-translate-y-[1px] hover:shadow-[0_14px_36px_rgba(0,0,0,0.08)]",
+                "active:translate-y-0",
+              )}
+              style={{ cursor: "pointer" }}
+            >
+              <ChevronRight className="h-5 w-5 text-black/70" />
+            </button>
+          </div>
         </div>
 
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Предыдущая коллекция"
-            onClick={goPrevCollection}
+        {/* Main (картинка на всю ширину блока) */}
+        {/* Main (картинка на всю ширину блока) */}
+        <div data-col-wrap className="mt-6 md:mt-8">
+          <div
             className={cn(
-              "grid h-10 w-10 place-items-center rounded-full",
+              "relative w-full overflow-visible rounded-2xl", // ✅ важно
               "border border-black/10 bg-white",
-              "shadow-[0_10px_28px_rgba(0,0,0,0.06)]",
-              "transition hover:-translate-y-[1px] hover:shadow-[0_14px_36px_rgba(0,0,0,0.08)]",
-              "active:translate-y-0",
+              "shadow-[0_22px_60px_rgba(0,0,0,0.08)]",
             )}
-            style={{ cursor: "pointer" }}
           >
-            <ChevronLeft className="h-5 w-5 text-black/70" />
-          </button>
-          <button
-            type="button"
-            aria-label="Следующая коллекция"
-            onClick={goNextCollection}
-            className={cn(
-              "grid h-10 w-10 place-items-center rounded-full",
-              "border border-black/10 bg-white",
-              "shadow-[0_10px_28px_rgba(0,0,0,0.06)]",
-              "transition hover:-translate-y-[1px] hover:shadow-[0_14px_36px_rgba(0,0,0,0.08)]",
-              "active:translate-y-0",
-            )}
-            style={{ cursor: "pointer" }}
-          >
-            <ChevronRight className="h-5 w-5 text-black/70" />
-          </button>
-        </div>
-      </div>
-
-      {/* Main */}
-      <div
-        data-col-wrap
-        className="mt-6 grid gap-7 md:mt-8 md:grid-cols-12 md:gap-10"
-      >
-        <button
-          type="button"
-          onClick={() => {
-            holdFor(2500);
-            setLightboxOpen(true);
-          }}
-          className={cn(
-            "relative overflow-hidden rounded-2xl md:col-span-7",
-            "border border-black/10 bg-white",
-            "shadow-[0_22px_60px_rgba(0,0,0,0.08)]",
-            "transition hover:-translate-y-[1px] hover:shadow-[0_30px_80px_rgba(0,0,0,0.10)]",
-          )}
-          style={{ cursor: "pointer" }}
-        >
-          <div className="relative aspect-[4/3] w-full">
-            {currentImg?.url ? (
-              <Image
-                src={resolveSrc(currentImg.url)}
-                alt={currentImg.alternativeText || current.title}
-                fill
-                sizes="(max-width: 768px) 100vw, 58vw"
-                className="object-cover"
-              />
-            ) : (
-              <div className="absolute inset-0 bg-black/5" />
-            )}
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent" />
-          </div>
-
-          {/* tiny indicator for debug (можешь убрать потом) */}
-          <div className="absolute left-3 top-3 rounded-full bg-white/80 px-3 py-1 text-[12px] text-black/70">
-            {activeCollection + 1}/{safeCollections.length} • {activeImage + 1}/
-            {currentImages.length}
-          </div>
-        </button>
-
-        <div className="md:col-span-5">
-          <h3 className="text-[20px] font-semibold leading-snug tracking-[-0.01em] text-black md:text-[22px]">
-            {current.title}
-          </h3>
-
-          {current.description && (
-            <p className="mt-3 whitespace-pre-line text-[14px] leading-[1.75] text-black/60 md:text-[15px]">
-              {current.description}
-            </p>
-          )}
-
-          <div className="mt-5 flex items-center gap-2">
-            {safeCollections.map((_, i) => (
+            {/* ✅ обрезаем только картинку */}
+            <div className="relative overflow-hidden rounded-2xl">
               <button
-                key={String(safeCollections[i].id)}
                 type="button"
-                aria-label={`Коллекция ${i + 1}`}
                 onClick={() => {
                   holdFor();
-                  setActiveCollection(i);
+                  setLightboxOpen(true);
+                }}
+                className="relative block w-full"
+                style={{ cursor: "pointer" }}
+              >
+                <div
+                  className="
+                    relative w-full
+                    h-[420px]
+                    sm:h-[480px]
+                    md:h-[560px]
+                    lg:h-[640px]
+                    xl:h-[720px]
+                  "
+                >
+                  {currentImg?.url ? (
+                    <Image
+                      src={resolveSrc(currentImg.url)}
+                      alt={currentImg.alternativeText || current.title}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 1200px"
+                      className="object-cover"
+                      priority
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-black/5" />
+                  )}
+
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent" />
+
+                  <div className="absolute left-3 top-3 rounded-full bg-white/80 px-3 py-1 text-[12px] text-black/70">
+                    {activeCollection + 1}/{safeCollections.length} •{" "}
+                    {activeImage + 1}/{currentImages.length}
+                  </div>
+
+                  {/* ✅ HOTSPOTS */}
+                  {hotspots.map((h) => (
+                    <button
+                      key={`${String(current?.id)}-${activeImage}-${h.id}`} // ✅ уникально только для React
+                      type="button"
+                      data-hotspot
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setOpenHotspotId((prev) =>
+                          prev === h.id ? null : h.id,
+                        ); // ✅ ВАЖНО: тут только h.id
+                      }}
+                      className={cn(
+                        "absolute z-[70] grid h-7 w-7 place-items-center rounded-full",
+                        "bg-white/85 backdrop-blur-xl",
+                        "ring-1 ring-black/10",
+                        "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
+                        "transition hover:scale-[1.04] active:scale-[0.98]",
+                      )}
+                      style={{
+                        left: `${h.xPct}%`,
+                        top: `${h.yPct}%`,
+                        transform: "translate(-50%, -50%)",
+                        cursor: "pointer",
+                      }}
+                      aria-label="Открыть модуль"
+                    >
+                      <span className="relative block h-2 w-2 rounded-full bg-black/80" />
+                      <span className="pointer-events-none absolute inset-0 rounded-full animate-ping bg-black/20" />
+                    </button>
+                  ))}
+
+                  {/* ✅ Карточка товара (НЕ обрезается, т.к. outer overflow-visible) */}
+                  {openHotspotId && activeHotspot && activeProduct ? (
+                    <div
+                      ref={cardRef}
+                      className={cn(
+                        "absolute z-[80]", // ✅ выше всего
+                        "w-[320px] max-w-[86vw]",
+                        "rounded-2xl border border-white/40",
+                        "bg-white/88 backdrop-blur-xl",
+                        "shadow-[0_22px_70px_rgba(0,0,0,0.22)]",
+                        "p-3",
+                      )}
+                      style={{
+                        left: `${activeHotspot.xPct}%`,
+                        top: `${activeHotspot.yPct}%`,
+                        transform:
+                          computedSide === "left"
+                            ? "translate(calc(-100% - 14px), -50%)"
+                            : "translate(14px, -50%)",
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-[11px] tracking-[0.18em] text-black/45">
+                          LIONETO • MODULE
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setOpenHotspotId(null);
+                          }}
+                          className="grid h-7 w-7 place-items-center rounded-full bg-black/5 hover:bg-black/8 transition"
+                          style={{ cursor: "pointer" }}
+                          aria-label="Закрыть"
+                        >
+                          <X className="h-4 w-4 text-black/65" />
+                        </button>
+                      </div>
+
+                      <Link
+                        href={`/product/${activeProduct.id}`}
+                        className="mt-2 block"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => setOpenHotspotId(null)}
+                      >
+                        <div className="flex gap-3">
+                          <div className="relative h-[64px] w-[92px] overflow-hidden rounded-xl bg-black/[0.03] ring-1 ring-black/10">
+                            <Image
+                              src={activeProduct.image}
+                              alt={activeProduct.title}
+                              fill
+                              sizes="92px"
+                              className="object-cover"
+                            />
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="text-[14px] font-semibold leading-snug text-black line-clamp-2">
+                              {activeProduct.title}
+                            </div>
+
+                            {activePriceRaw ? (
+                              <div className="mt-1 text-[13px] font-semibold text-black">
+                                {formatPrice(activePriceRaw, currency)}
+                              </div>
+                            ) : (
+                              <div className="mt-1 text-[12px] text-black/45">
+                                Цена уточняется
+                              </div>
+                            )}
+
+                            <div className="mt-1 text-[12px] text-black/45">
+                              Открыть товар →
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    </div>
+                  ) : null}
+
+                  {/* ✅ Описание справа */}
+                  <div
+                    className={cn(
+                      "pointer-events-none absolute right-4 top-4 hidden md:flex",
+                      "z-[26]",
+                      "w-[340px] max-w-[40%]",
+                      "flex-col",
+                      "rounded-2xl border border-white/40",
+                      "bg-white/82 backdrop-blur-xl",
+                      "shadow-[0_18px_60px_rgba(0,0,0,0.12)]",
+                      "p-5",
+                    )}
+                    style={{ maxHeight: "calc(100% - 32px)" }}
+                  >
+                    <div>
+                      <div className="text-[18px] font-semibold tracking-[-0.01em] text-black">
+                        {current.title}
+                      </div>
+                      {current.description ? (
+                        <div className="mt-3 text-[13px] leading-[1.75] text-black/60 line-clamp-6">
+                          {current.description}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2 pointer-events-auto">
+                      {safeCollections.map((_, i) => (
+                        <button
+                          key={String(safeCollections[i].id)}
+                          type="button"
+                          aria-label={`Коллекция ${i + 1}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            holdFor();
+                            setActiveCollection(i);
+                          }}
+                          className={cn(
+                            "h-2 w-2 rounded-full transition",
+                            i === activeCollection
+                              ? "bg-black/70"
+                              : "bg-black/20 hover:bg-black/35",
+                          )}
+                          style={{ cursor: "pointer" }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* ✅ На мобилке описание под картинкой */}
+            <div className="px-4 pb-4 pt-4 md:hidden">
+              <h3 className="text-[20px] font-semibold leading-snug tracking-[-0.01em] text-black">
+                {current.title}
+              </h3>
+
+              {current.description && (
+                <p className="mt-3 whitespace-pre-line text-[14px] leading-[1.75] text-black/60">
+                  {current.description}
+                </p>
+              )}
+
+              <div className="mt-4 flex items-center gap-2">
+                {safeCollections.map((_, i) => (
+                  <button
+                    key={String(safeCollections[i].id)}
+                    type="button"
+                    aria-label={`Коллекция ${i + 1}`}
+                    onClick={() => {
+                      holdFor();
+                      setActiveCollection(i);
+                    }}
+                    className={cn(
+                      "h-2 w-2 rounded-full transition",
+                      i === activeCollection
+                        ? "bg-black/70"
+                        : "bg-black/20 hover:bg-black/35",
+                    )}
+                    style={{ cursor: "pointer" }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Thumbs */}
+        <div data-col-thumbs className="mt-6 md:mt-7">
+          <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {currentImages.map((img, i) => (
+              <button
+                key={`${current.id}-img-${i}`}
+                type="button"
+                onClick={() => {
+                  holdFor();
+                  setActiveImage(i);
                 }}
                 className={cn(
-                  "h-2 w-2 rounded-full transition",
-                  i === activeCollection
-                    ? "bg-black/70"
-                    : "bg-black/20 hover:bg-black/35",
+                  "relative h-[86px] w-[140px] shrink-0 overflow-hidden rounded-xl",
+                  "border border-black/10 bg-white",
+                  "shadow-[0_10px_26px_rgba(0,0,0,0.06)]",
+                  "transition hover:-translate-y-[1px]",
+                  i === activeImage ? "ring-2 ring-black/35" : "ring-0",
                 )}
                 style={{ cursor: "pointer" }}
+              >
+                <Image
+                  src={resolveSrc(img.url)}
+                  alt={img.alternativeText || `Фото ${i + 1}`}
+                  fill
+                  sizes="140px"
+                  className="object-cover"
+                />
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3 flex items-center justify-center gap-2">
+            {currentImages.slice(0, 7).map((_, i) => (
+              <span
+                key={`dot-${i}`}
+                className={cn(
+                  "h-1.5 w-1.5 rounded-full",
+                  i === activeImage ? "bg-black/65" : "bg-black/18",
+                )}
               />
             ))}
           </div>
         </div>
+
+        {lightboxOpen && (
+          <Lightbox
+            title={current.title}
+            images={currentImages}
+            activeIndex={activeImage}
+            onClose={() => setLightboxOpen(false)}
+            onPrev={goPrevImage}
+            onNext={goNextImage}
+            onPick={(i) => {
+              holdFor();
+              setActiveImage(i);
+            }}
+          />
+        )}
       </div>
-
-      {/* Thumbs */}
-      <div data-col-thumbs className="mt-6 md:mt-7">
-        <div className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {currentImages.map((img, i) => (
-            <button
-              key={`${current.id}-img-${i}`}
-              type="button"
-              onClick={() => {
-                holdFor();
-                setActiveImage(i);
-              }}
-              className={cn(
-                "relative h-[86px] w-[140px] shrink-0 overflow-hidden rounded-xl",
-                "border border-black/10 bg-white",
-                "shadow-[0_10px_26px_rgba(0,0,0,0.06)]",
-                "transition hover:-translate-y-[1px]",
-                i === activeImage ? "ring-2 ring-black/35" : "ring-0",
-              )}
-              style={{ cursor: "pointer" }}
-            >
-              <Image
-                src={resolveSrc(img.url)}
-                alt={img.alternativeText || `Фото ${i + 1}`}
-                fill
-                sizes="140px"
-                className="object-cover"
-              />
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-3 flex items-center justify-center gap-2">
-          {currentImages.slice(0, 7).map((_, i) => (
-            <span
-              key={`dot-${i}`}
-              className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                i === activeImage ? "bg-black/65" : "bg-black/18",
-              )}
-            />
-          ))}
-        </div>
-      </div>
-
-      {lightboxOpen && (
-        <Lightbox
-          title={current.title}
-          images={currentImages}
-          activeIndex={activeImage}
-          onClose={() => setLightboxOpen(false)}
-          onPrev={goPrevImage}
-          onNext={goNextImage}
-          onPick={(i) => {
-            holdFor(3500);
-            setActiveImage(i);
-          }}
-        />
-      )}
     </section>
   );
 }

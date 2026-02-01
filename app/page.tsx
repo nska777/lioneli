@@ -12,52 +12,8 @@ import NewsletterCta from "./components/home/NewsletterCta";
 
 import { getGlobal } from "../app/lib/strapi";
 
-const demoCollections = [
-  {
-    id: "1",
-    title: "Спальня Salvador — идеальная классика",
-    description:
-      "Премиальная коллекция «SALVADOR», выполненная в неоклассическом стиле — это исключительное качество и элегантность, представленное в таких трендовых цветовых решениях, как: «Белый», «Пепельная Роза» и «Кашемир».\n\nПремиальная коллекция «SALVADOR», выполненная в неоклассическом стиле — это исключительное качество и элегантность, представленное в таких трендовых цветовых решениях, как: «Белый», «Пепельная Роза» и «Кашемир».",
-    images: [
-      { url: "/images/home/collections/1.jpg" },
-      { url: "/images/home/collections/2.jpg" },
-      { url: "/images/home/collections/3.jpg" },
-    ],
-  },
-  {
-    id: "2",
-    title: "Amber — свет и воздух",
-    description:
-      "AMBER — коллекция, выполненная в стиле контемпорари — это элегантный и функциональный дизайн, сочетающий в себе современные тенденции и высокое качество материалов. AMBER — это широкий модульный ряд, благодаря которому в едином стиле можно обставить квартиру и даже целый дом!",
-    images: [
-      { url: "/images/home/collections/4.jpg" },
-      { url: "/images/home/collections/5.jpg" },
-      { url: "/images/home/collections/6.jpg" },
-    ],
-  },
-  {
-    id: "3",
-    title: "Pitti",
-    description:
-      "Коллекция мебели «Pitti» была названа в честь самого большого дворца во Флоренции. Использование натуральных материалов (массив ясеня), изящные линии, благородные ткани и тёмная гамма — всё это отсылает к флорентийскому стилю.",
-    images: [
-      { url: "/images/home/collections/7.jpg" },
-      { url: "/images/home/collections/8.jpg" },
-      { url: "/images/home/collections/9.jpg" },
-    ],
-  },
-  {
-    id: "4",
-    title: "SCANDY",
-    description:
-      "В коллекции SCANDY, выполненной в скандинавском стиле, всё лаконично и натурально. Добротность, функциональность и комфорт — всё то, что так ценят современные покупатели.",
-    images: [
-      { url: "/images/home/collections/10.jpg" },
-      { url: "/images/home/collections/11.jpg" },
-      { url: "/images/home/collections/12.jpg" },
-    ],
-  },
-];
+// ✅ НОВЫЕ моки только для CollectionsSlider
+import { COLLECTIONS_SLIDER_MOCK } from "./lib/mock/collections-slider"; // ⚠️ если путь другой — поправь
 
 export default async function Page() {
   const global = await getGlobal();
@@ -74,7 +30,7 @@ export default async function Page() {
       <AboutCompany />
 
       <CollectionsSlider
-        collections={demoCollections}
+        collections={COLLECTIONS_SLIDER_MOCK}
         autoplayMs={7500}
         imageAutoplayMs={2600}
       />
