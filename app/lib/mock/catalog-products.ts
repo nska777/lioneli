@@ -31,7 +31,7 @@ export const BRANDS: BrandItem[] = [
   { title: "ELIZABETH", slug: "elizabeth" },
   { title: "PITTI", slug: "pitti" },
   { title: "SALVADOR", slug: "salvador" },
-  { title: "SCANDY", slug: "scand" },
+  { title: "SCANDY", slug: "scandi" },
 ];
 
 // ==============================

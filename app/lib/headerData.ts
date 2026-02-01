@@ -1,5 +1,46 @@
 // app/lib/headerData.ts
+export type MegaSlidesKey = `${string}:${string}`; // "bedrooms:amber"
 
+export const MEGA_SLIDES: Record<MegaSlidesKey, string[]> = {
+  // bedrooms
+  "bedrooms:amber": [
+    "/mega/bedrooms/amber/055.jpg",
+    "/mega/bedrooms/amber/02.jpg",
+    "/mega/bedrooms/amber/03.jpg",
+  ],
+  "bedrooms:buongiorno": [
+    "/mega/bedrooms/buongiorno/01.jpg",
+    "/mega/bedrooms/buongiorno/02.jpg",
+  ],
+  "bedrooms:elizabeth": ["/mega/bedrooms/elizabeth/01.jpg"],
+  "bedrooms:pitti": ["/mega/bedrooms/pitti/01.jpg"],
+  "bedrooms:salvador": ["/mega/bedrooms/salvador/01.jpg"],
+  "bedrooms:scandy": ["/mega/bedrooms/scandy/01.jpg"],
+
+  // living
+  "living:amber": ["/mega/living/amber/01.jpg"],
+  "living:buongiorno": ["/mega/living/buongiorno/01.jpg"],
+  "living:elizabeth": ["/mega/living/elizabeth/01.jpg"],
+  "living:pitti": ["/mega/living/pitti/01.jpg"],
+  "living:salvador": ["/mega/living/salvador/01.jpg"],
+  "living:scandy": ["/mega/living/scandy/01.jpg"],
+
+  // youth
+  "youth:amber": ["/mega/youth/amber/01.jpg"],
+  "youth:buongiorno": ["/mega/youth/buongiorno/01.jpg"],
+  "youth:elizabeth": ["/mega/youth/elizabeth/01.jpg"],
+  "youth:pitti": ["/mega/youth/pitti/01.jpg"],
+  "youth:salvador": ["/mega/youth/salvador/01.jpg"],
+  "youth:scandy": ["/mega/youth/scandy/01.jpg"],
+
+  // tables_chairs
+  "tables_chairs:amber": ["/mega/tables_chairs/amber/01.jpg"],
+  "tables_chairs:buongiorno": ["/mega/tables_chairs/buongiorno/01.jpg"],
+
+  // hallway
+  "hallway:amber": ["/mega/hallway/amber/01.jpg"],
+  "hallway:buongiorno": ["/mega/hallway/buongiorno/01.jpg"],
+};
 export type MegaItem = { labelKey: string; fallback: string; href: string };
 
 export type MegaKey =
@@ -146,7 +187,7 @@ export const megaCategories: MegaCategory[] = [
       },
       {
         labelKey: "brand.pitti_alt",
-        fallback: "ПАТТИ",
+        fallback: "ПИТТИ",
         href: makeCollectionHref("pitti", "living"),
       },
       {
@@ -156,8 +197,26 @@ export const megaCategories: MegaCategory[] = [
       },
       {
         labelKey: "brand.bergen_white",
-        fallback: "BERGEN WHITE",
+        fallback: "БОНЖОРНО",
         href: makeCollectionHref("buongiorno", "living"),
+      },
+    ],
+  },
+   {
+    key: "wardrobes",
+    labelKey: "header.mega.youth",
+    fallback: "МОЛОДЕЖНЫЕ",
+    href: "/category/youth",
+    items: [
+      {
+        labelKey: "brand.scandi",
+        fallback: "СКАНДИ",
+        href: makeCollectionHref("scandi", "youth"),
+      },
+      {
+        labelKey: "brand.elizabeth",
+        fallback: "ЭЛИЗАБЕТ",
+        href: makeCollectionHref("elizabeth", "youth"),
       },
     ],
   },
@@ -187,24 +246,7 @@ export const megaCategories: MegaCategory[] = [
       },
     ],
   },
-  {
-    key: "wardrobes",
-    labelKey: "header.mega.youth",
-    fallback: "МОЛОДЕЖНЫЕ",
-    href: "/category/youth",
-    items: [
-      {
-        labelKey: "brand.scandi",
-        fallback: "СКАНДИ",
-        href: makeCollectionHref("scandi", "youth"),
-      },
-      {
-        labelKey: "brand.elizabeth",
-        fallback: "ЭЛИЗАБЕТ",
-        href: makeCollectionHref("elizabeth", "youth"),
-      },
-    ],
-  },
+ 
 ];
 
 /* =========================
@@ -275,7 +317,7 @@ export const MEGA_PREVIEWS: Record<string, MegaPreview> = {
   },
   [makeCollectionHref("pitti", "living")]: {
     titleKey: "mega.preview.living.pitti",
-    fallback: "Гостиная «ПАТТИ»",
+    fallback: "Гостиная «ПИТТИ»",
     main: "/mega/living/pitti/main.jpg",
     a: "/mega/living/pitti/1.jpg",
     b: "/mega/living/pitti/2.jpg",
@@ -284,12 +326,11 @@ export const MEGA_PREVIEWS: Record<string, MegaPreview> = {
     titleKey: "mega.preview.living.salvador",
     fallback: "Гостиная «САЛЬВАДОР»",
     main: "/mega/living/salvador/main.jpg",
-    a: "/mega/living/salvador/1.jpg",
-    b: "/mega/living/salvador/2.jpg",
+ 
   },
   [makeCollectionHref("buongiorno", "living")]: {
     titleKey: "mega.preview.living.bergenWhite",
-    fallback: "Гостиная «BERGEN WHITE»",
+    fallback: "Гостиная «БОНЖОРНО»",
     main: "/mega/living/buongiorno/main.jpg",
     a: "/mega/living/buongiorno/1.jpg",
     b: "/mega/living/buongiorno/2.jpg",
@@ -307,8 +348,6 @@ export const MEGA_PREVIEWS: Record<string, MegaPreview> = {
     titleKey: "mega.preview.youth.elizabeth",
     fallback: "Молодежная «ЭЛИЗАБЕТ»",
     main: "/mega/youth/elizabeth/main.jpg",
-    a: "/mega/youth/elizabeth/1.jpg",
-    b: "/mega/youth/elizabeth/2.jpg",
   },
 };
 

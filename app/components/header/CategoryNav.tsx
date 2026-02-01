@@ -389,10 +389,6 @@ export default function CategoryNav({
                           onGo={() => setActive(null)}
                         />
                       </div>
-
-                      <div className="mt-5 rounded-xl border border-black/10 bg-white px-4 py-3 text-[12px] tracking-[0.14em] uppercase text-black/55">
-                        Скоро здесь будут карточки / листание / “заказать”
-                      </div>
                     </div>
                   </div>
                 </div>
