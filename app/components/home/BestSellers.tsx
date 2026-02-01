@@ -74,12 +74,76 @@ type HitUIItem = {
   price_rub: number;
   price_uzs: number;
 
-  badge: string; // ✅ всегда “Хит продаж”
+  badge: string; // текст бейджа
   skuLabel?: string;
 
   // ✅ премиальный нижний лейбл
   brandLabel?: string;
 };
+
+function BadgePill({
+  text,
+  variant,
+}: {
+  text: string;
+  variant: "gold" | "green";
+}) {
+  const isGreen = variant === "green";
+
+  return (
+    <span className="relative inline-flex h-7 items-center overflow-hidden rounded-[12px] px-3">
+      {/* base radial */}
+      <span
+        className="absolute inset-0 rounded-[12px]"
+        style={{
+          background: isGreen
+            ? "radial-gradient(120% 140% at 30% 20%, #E8FFF2 0%, #BFF7D6 28%, #57E39A 55%, #17B868 78%, #0C7F45 100%)"
+            : "radial-gradient(120% 140% at 30% 20%, #FFF1B8 0%, #FFD36A 35%, #E6A93C 65%, #C98A1A 100%)",
+        }}
+      />
+
+      {/* inner gloss */}
+      <span
+        className="absolute inset-[1px] rounded-[11px]"
+        style={{
+          background: isGreen
+            ? "linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.10))"
+            : "linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.12))",
+        }}
+      />
+
+      {/* edge + shadow */}
+      <span
+        className="absolute inset-0 rounded-[12px]"
+        style={{
+          boxShadow: isGreen
+            ? "0 0 0 1px rgba(120, 255, 190, 0.85), 0 10px 28px rgba(12, 127, 69, 0.28)"
+            : "0 0 0 1px rgba(255,215,130,0.85), 0 10px 28px rgba(201,138,26,0.35)",
+        }}
+      />
+
+      {/* subtle shine on hover */}
+      <span
+        className="pointer-events-none absolute -left-[60%] top-0 h-full w-[60%] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+        style={{
+          background:
+            "linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.70) 50%, transparent 100%)",
+          transform: "skewX(-20deg)",
+        }}
+      />
+
+      {/* text */}
+      <span
+        className={cn(
+          "relative z-10 text-[12px] font-semibold tracking-[0.04em]",
+          isGreen ? "text-[#064B2A]" : "text-[#5A3A00]",
+        )}
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
 
 export default function BestSellers({
   title = "Хит продаж",
@@ -101,7 +165,6 @@ export default function BestSellers({
   }, []);
 
   // ✅ Абсолютный рандом: каждый заход новый (seed каждый mount)
-  // ✅ внутри одного захода — не прыгает
   const list = useMemo<HitUIItem[]>(() => {
     const all = (CATALOG_MOCK ?? []) as any[];
     if (!all.length) return [];
@@ -116,6 +179,8 @@ export default function BestSellers({
         .trim();
       const brandLabel = mapBrandLabel(brandRaw) || undefined;
 
+      // ⚠️ тут бейдж как и был “Хит продаж”
+      // для “Лучшая цена” можешь прокинуть другое значение снаружи или поменять тут
       return {
         id: String(p.id),
         title: p.title,
@@ -128,7 +193,6 @@ export default function BestSellers({
 
         badge: "Хит продаж",
         skuLabel: `ID: ${p.id}`,
-
         brandLabel,
       };
     });
@@ -424,6 +488,10 @@ export default function BestSellers({
                 price_rub: p.price_rub,
               };
 
+              // ✅ если это “Лучшая цена” — зелёный премиум
+              const badgeVariant =
+                /лучш/i.test(title) || /лучш/i.test(p.badge) ? "green" : "gold";
+
               return (
                 <Link
                   key={`${p.id}-${idx}`}
@@ -449,49 +517,7 @@ export default function BestSellers({
                     <div className="relative overflow-hidden rounded-t-[22px] bg-white">
                       {/* badge */}
                       <div className="absolute left-3 top-3 z-10">
-                        <span className="relative inline-flex items-center h-7 px-3 rounded-[12px] overflow-hidden">
-                          {/* radial gold base */}
-                          <span
-                            className="absolute inset-0 rounded-[12px]"
-                            style={{
-                              background:
-                                "radial-gradient(120% 140% at 30% 20%, #FFF1B8 0%, #FFD36A 35%, #E6A93C 65%, #C98A1A 100%)",
-                            }}
-                          />
-
-                          {/* inner gloss */}
-                          <span
-                            className="absolute inset-[1px] rounded-[11px]"
-                            style={{
-                              background:
-                                "linear-gradient(180deg, rgba(255,255,255,0.55), rgba(255,255,255,0.12))",
-                            }}
-                          />
-
-                          {/* gold edge */}
-                          <span
-                            className="absolute inset-0 rounded-[12px]"
-                            style={{
-                              boxShadow:
-                                "0 0 0 1px rgba(255,215,130,0.85), 0 10px 28px rgba(201,138,26,0.35)",
-                            }}
-                          />
-
-                          {/* subtle shine on hover */}
-                          <span
-                            className="pointer-events-none absolute -left-[60%] top-0 h-full w-[60%] opacity-0 group-hover:opacity-100 transition-opacity duration-500"
-                            style={{
-                              background:
-                                "linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.65) 50%, transparent 100%)",
-                              transform: "skewX(-20deg)",
-                            }}
-                          />
-
-                          {/* text */}
-                          <span className="relative z-10 text-[12px] font-semibold tracking-[0.04em] text-[#5A3A00]">
-                            {p.badge}
-                          </span>
-                        </span>
+                        <BadgePill text={p.badge} variant={badgeVariant} />
                       </div>
 
                       {/* actions */}
@@ -515,7 +541,7 @@ export default function BestSellers({
                       <div
                         className={cn(
                           "relative aspect-[4/3] bg-white",
-                          "px-3 py-3",
+                          "px-3 py-2",
                         )}
                       >
                         <Image
@@ -532,23 +558,23 @@ export default function BestSellers({
                       </div>
                     </div>
 
-                    {/* content */}
-                    <div className="px-5 pt-3 pb-4">
+                    {/* content (✅ меньше воздуха снизу) */}
+                    <div className="px-5 pt-3 pb-3">
                       <div className="text-[20px] font-semibold tracking-[-0.01em] text-black">
                         {formatPrice(value, currency)}
                       </div>
 
-                      <div className="mt-1.5 text-[14px] leading-snug text-black/70 line-clamp-2">
+                      <div className="mt-1 text-[14px] leading-snug text-black/70 line-clamp-2">
                         {p.title}
                       </div>
 
-                      {/* ✅ премиальный лейбл бренда/коллекции */}
+                      {/* ✅ лейбл бренда — ближе, чтобы не раздувать низ */}
                       {p.brandLabel ? (
-                        <div className="mt-2 text-[11px] tracking-[0.18em] uppercase text-black/45">
+                        <div className="mt-1.5 text-[11px] tracking-[0.18em] uppercase text-black/45">
                           {p.brandLabel}
                         </div>
                       ) : (
-                        <div className="mt-2 h-[14px]" />
+                        <div className="mt-1.5 h-[12px]" />
                       )}
                     </div>
 

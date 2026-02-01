@@ -112,6 +112,63 @@ function toCapsLabel(v?: string | null) {
   return s.toUpperCase();
 }
 
+function BestPriceBadge({
+  text,
+  discountPercent,
+}: {
+  text: string;
+  discountPercent?: number | null;
+}) {
+  return (
+    <span className="relative inline-flex h-7 items-center overflow-hidden rounded-[12px] px-3">
+      {/* green radial base */}
+      <span
+        className="absolute inset-0 rounded-[12px]"
+        style={{
+          background:
+            "radial-gradient(120% 140% at 30% 20%, #E8FFF2 0%, #BFF7D6 28%, #57E39A 55%, #17B868 78%, #0C7F45 100%)",
+        }}
+      />
+
+      {/* inner gloss */}
+      <span
+        className="absolute inset-[1px] rounded-[11px]"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.10))",
+        }}
+      />
+
+      {/* edge + shadow */}
+      <span
+        className="absolute inset-0 rounded-[12px]"
+        style={{
+          boxShadow:
+            "0 0 0 1px rgba(120,255,190,0.85), 0 10px 28px rgba(12,127,69,0.28)",
+        }}
+      />
+
+      {/* shine on hover */}
+      <span
+        className="pointer-events-none absolute -left-[60%] top-0 h-full w-[60%] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+        style={{
+          background:
+            "linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.70) 50%, transparent 100%)",
+          transform: "skewX(-20deg)",
+        }}
+      />
+
+      {/* text */}
+      <span className="relative z-10 inline-flex items-center text-[12px] font-semibold tracking-[0.04em] text-[#064B2A]">
+        {text}
+        {discountPercent ? (
+          <span className="ml-2 text-[#064B2A]/80">−{discountPercent}%</span>
+        ) : null}
+      </span>
+    </span>
+  );
+}
+
 export default function BestPrice({
   title = "Лучшая цена",
 }: {
@@ -184,7 +241,6 @@ export default function BestPrice({
       const price_rub = safeNumber(p.price_rub ?? p.priceRUB ?? 0);
       const price_uzs = safeNumber(p.price_uzs ?? p.priceUZS ?? 0);
 
-      // ✅ как в Хит продаж: показываем ОДНУ строку (collection если есть, иначе brand)
       const line =
         toCapsLabel(p.collection ?? null) ||
         toCapsLabel(p.brand ?? null) ||
@@ -238,7 +294,7 @@ export default function BestPrice({
     ) as HTMLElement | null;
     if (!card) return;
 
-    const gap = 24; // как у Хит продаж (визуально)
+    const gap = 24;
     const cw = card.getBoundingClientRect().width;
     const perView =
       window.innerWidth >= 1024 ? 3 : window.innerWidth >= 768 ? 2 : 1;
@@ -518,28 +574,17 @@ export default function BestPrice({
                       "rounded-[22px]",
                       "shadow-[0_10px_30px_rgba(0,0,0,0.08)]",
                       "transition",
+                      "group-hover:-translate-y-[2px]",
+                      "group-hover:shadow-[0_18px_50px_rgba(0,0,0,0.10)]",
                     )}
                   >
                     <div className="relative overflow-hidden rounded-[22px]">
-                      {/* badge */}
-                      <div className="absolute left-2 top-2 z-10">
-                        <span
-                          className={cn(
-                            "inline-flex items-center",
-                            "h-7 px-3 rounded-[12px]",
-                            "bg-white/88 backdrop-blur-xl",
-                            "border border-emerald-400/60",
-                            "text-[12px] font-medium text-emerald-700",
-                            "shadow-[0_14px_40px_rgba(0,0,0,0.18)]",
-                          )}
-                        >
-                          {p.badge}
-                          {p.discountPercent ? (
-                            <span className="ml-2 text-emerald-700/80">
-                              −{p.discountPercent}%
-                            </span>
-                          ) : null}
-                        </span>
+                      {/* ✅ premium green badge */}
+                      <div className="absolute left-3 top-3 z-10">
+                        <BestPriceBadge
+                          text={p.badge}
+                          discountPercent={p.discountPercent}
+                        />
                       </div>
 
                       {/* actions */}
@@ -560,8 +605,8 @@ export default function BestPrice({
                         />
                       </div>
 
-                      {/* ✅ image — как в Хит продаж: чисто, без внутреннего серого фона */}
-                      <div className="relative aspect-[4/3] bg-white">
+                      {/* image */}
+                      <div className="relative aspect-[4/3] bg-white px-3 py-2">
                         <Image
                           src={p.image}
                           alt={p.title}
@@ -572,32 +617,26 @@ export default function BestPrice({
                       </div>
                     </div>
 
-                    {/* content */}
-                    <div className="px-5 pt-4 pb-5 flex flex-col justify-between min-h-[148px]">
-                      <div>
-                        <div className="flex items-baseline gap-3">
-                          <div className="text-[18px] font-semibold tracking-[-0.01em] text-black">
-                            {formatPrice(price, currency)}
+                    {/* ✅ content — подсушено, без лишнего “воздуха” */}
+                    <div className="px-5 pt-3 pb-3 min-h-[112px]">
+                      <div className="flex items-baseline gap-3">
+                        <div className="text-[18px] font-semibold tracking-[-0.01em] text-black">
+                          {formatPrice(price, currency)}
+                        </div>
+                        {old ? (
+                          <div className="text-[12px] text-black/40 line-through">
+                            {formatPrice(old, currency)}
                           </div>
-                          {old ? (
-                            <div className="text-[12px] text-black/40 line-through">
-                              {formatPrice(old, currency)}
-                            </div>
-                          ) : null}
-                        </div>
-
-                        <div className="mt-2 text-[13px] leading-snug text-black/70 line-clamp-2">
-                          {p.title}
-                        </div>
-
-                        {/* ✅ как в Хит продаж: просто строка капсом, без пилюли */}
-                        <div className="mt-3 text-[10px] tracking-[0.18em] text-black/40">
-                          {p.brandLine ?? "—"}
-                        </div>
+                        ) : null}
                       </div>
 
-                      {/* ✅ как у тебя было: “визуально убрано” (оставим) */}
-                      <div className="mt-2 text-[12px] text-transparent">—</div>
+                      <div className="mt-1.5 text-[13px] leading-snug text-black/70 line-clamp-2">
+                        {p.title}
+                      </div>
+
+                      <div className="mt-2 text-[10px] tracking-[0.18em] uppercase text-black/40">
+                        {p.brandLine ?? "—"}
+                      </div>
                     </div>
                   </div>
                 </Link>

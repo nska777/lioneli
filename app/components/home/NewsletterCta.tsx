@@ -1,40 +1,34 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
+import { Send } from "lucide-react";
 
 gsap.registerPlugin(ScrollTrigger);
 
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
 
-function isEmail(v: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(v.trim());
-}
-
 export default function NewsletterCta({
-  backgroundUrl = "/images/home/newsletter-bg.jpg", // положи картинку в public
+  backgroundUrl = "/images/home/newsletter-bg.jpg",
   title = "БУДЬТЕ В КУРСЕ",
-  subtitle = "Узнайте первыми о наших новых акциях и распродажах",
+  subtitle = "Подписывайтесь на наш Telegram — только важные новости и акции",
+  telegramUrl = "https://t.me/your_channel",
 }: {
   backgroundUrl?: string;
   title?: string;
   subtitle?: string;
+  telegramUrl?: string;
 }) {
   const rootRef = useRef<HTMLElement | null>(null);
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<
-    "idle" | "loading" | "success" | "error"
-  >("idle");
-  const [msg, setMsg] = useState<string>("");
 
   useLayoutEffect(() => {
     if (!rootRef.current) return;
 
     const ctx = gsap.context(() => {
-      const q = gsap.utils.selector(rootRef);
-      const el = q('[data-nl="wrap"]');
+      const el = rootRef.current!.querySelector('[data-nl="wrap"]');
+      if (!el) return;
 
       gsap.set(el, { opacity: 0, y: 16 });
 
@@ -43,50 +37,18 @@ export default function NewsletterCta({
         start: "top 80%",
         once: true,
         onEnter: () => {
-          gsap.to(el, { opacity: 1, y: 0, duration: 0.8, ease: "power3.out" });
+          gsap.to(el, {
+            opacity: 1,
+            y: 0,
+            duration: 0.8,
+            ease: "power3.out",
+          });
         },
       });
     }, rootRef);
 
     return () => ctx.revert();
   }, []);
-
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-
-    const v = email.trim();
-    if (!isEmail(v)) {
-      setStatus("error");
-      setMsg("Введите корректный email.");
-      return;
-    }
-
-    try {
-      setStatus("loading");
-      setMsg("");
-
-      const res = await fetch("/api/subscribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: v }),
-      });
-
-      const data = (await res.json()) as { ok?: boolean; message?: string };
-
-      if (!res.ok || !data.ok) {
-        setStatus("error");
-        setMsg(data.message || "Не удалось подписаться. Попробуйте позже.");
-        return;
-      }
-
-      setStatus("success");
-      setMsg("Готово! Проверьте почту — мы отправили подтверждение.");
-      setEmail("");
-    } catch {
-      setStatus("error");
-      setMsg("Сеть недоступна. Попробуйте ещё раз.");
-    }
-  }
 
   return (
     <section ref={rootRef} className="mx-auto w-full max-w-[1200px] px-4 py-14">
@@ -96,68 +58,58 @@ export default function NewsletterCta({
       >
         {/* background image */}
         <div
-          className="absolute inset-0 bg-center bg-cover"
+          className="absolute inset-0 bg-cover bg-center"
           style={{ backgroundImage: `url(${backgroundUrl})` }}
         />
 
-        {/* overlay (лёгкий, без blur) */}
-        <div className="absolute inset-0 bg-black/35" />
+        {/* overlay — аккуратный, без засвета */}
+        <div className="absolute inset-0 bg-black/40" />
 
         {/* content */}
         <div className="relative px-5 py-10 text-center text-white md:px-10 md:py-14">
-          <h3 className="text-[22px] font-semibold tracking-[0.14em] md:text-[28px]">
+          <h3 className="text-[22px] font-semibold tracking-[0.18em] md:text-[28px]">
             {title}
           </h3>
+
           <p className="mt-2 text-[14px] text-white/85 md:text-[15px]">
             {subtitle}
           </p>
 
-          <form
-            onSubmit={onSubmit}
-            className="mx-auto mt-6 flex w-full max-w-[520px] flex-col gap-3 sm:flex-row sm:gap-2"
-          >
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Электронная почта"
+          {/* TELEGRAM BUTTON */}
+          <div className="mt-7 flex justify-center">
+            <a
+              href={telegramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className={cn(
-                "h-11 w-full rounded-none border border-white/60 bg-white/10 px-4 text-[14px] text-white outline-none",
-                "placeholder:text-white/70",
-                "transition",
-                status === "error" && "border-red-300",
-              )}
-              autoComplete="email"
-              inputMode="email"
-            />
-
-            <button
-              type="submit"
-              disabled={status === "loading"}
-              className={cn(
-                "h-11 shrink-0 cursor-pointer rounded-none border border-[#c9a567] bg-[#c9a567] px-7 text-[13px] font-semibold tracking-[0.14em] text-white",
-                "transition-transform will-change-transform",
-                "active:scale-[0.99]",
-                status === "loading" && "opacity-70",
+                "group relative inline-flex h-12 items-center gap-3 overflow-hidden rounded-full px-8",
+                "border border-white/30 backdrop-blur-md",
+                "transition-all duration-300",
+                "hover:scale-[1.02] active:scale-[0.99]",
               )}
             >
-              {status === "loading" ? "..." : "ПОДПИСАТЬСЯ"}
-            </button>
-          </form>
+              {/* radial gradient background */}
+              <span
+                className={cn(
+                  "absolute inset-0",
+                  "bg-[radial-gradient(120%_120%_at_30%_0%,#e7c47a_0%,#c9a567_35%,#11aade_100%)]",
+                  "opacity-95 transition-opacity duration-300 group-hover:opacity-100",
+                )}
+              />
 
-          {msg ? (
-            <div
-              className={cn(
-                "mx-auto mt-3 max-w-[520px] text-[13px]",
-                status === "success" ? "text-white/90" : "text-white/90",
-              )}
-            >
-              {msg}
-            </div>
-          ) : null}
+              {/* subtle shine */}
+              <span className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full bg-white/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
-          <div className="mx-auto mt-3 max-w-[720px] text-[12px] text-white/70">
-            Нажимая «Подписаться», вы соглашаетесь получать письма от Lioneto.
-            Отписка — в 1 клик.
+              {/* content */}
+              <span className="relative z-10 flex items-center gap-3 text-[13px] font-semibold tracking-[0.18em] text-white">
+                ПОДПИСАТЬСЯ В TELEGRAM
+                <Send className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </a>
+          </div>
+
+          <div className="mx-auto mt-4 max-w-[720px] text-[12px] text-white/70">
+            Без спама. Только поступления, акции и важные обновления Lioneto.
           </div>
         </div>
       </div>

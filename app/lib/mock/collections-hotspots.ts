@@ -43,7 +43,7 @@ export const COLLECTIONS_HOTSPOTS: CollectionsHotspots = {
       { id: "s-1", productId: "scandi-krovati-min-base", xPct: 44, yPct: 70 },
 			{ id: "s-2", productId: "scandi-zerkala-on-dresser", xPct: 92, yPct: 45 },
 			{ id: "s-3", productId: "scandi-shkafy-3d-mirror-combined", xPct: 66, yPct: 55 },
-			{ id: "s-4", productId: "scandi-krovati-min-base", xPct: 87, yPct: 63 },
+			{ id: "s-4", productId: "scandi-stoli-toilet", xPct: 87, yPct: 63 },
 			{ id: "s-5", productId: "scandi-tumby-bedside", xPct: 10, yPct: 75 },
 			{ id: "s-6", productId: "scandi-shkafy-1d-blind", xPct: 53, yPct: 55 },
     ],

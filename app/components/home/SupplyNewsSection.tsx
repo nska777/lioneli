@@ -19,6 +19,21 @@ export type NewsItem = {
   image?: string; // "/news/1.jpg"
 };
 
+const FALLBACK_IMAGES = [
+  "/hero/1.jpg",
+  "/hero/2.jpg",
+  "/hero/3.jpg",
+  "/hero/4.jpg",
+  "/hero/5.jpg",
+  "/hero/6.jpg",
+];
+
+function getTmpImage(n: NewsItem, idx: number) {
+  return (
+    n.image || FALLBACK_IMAGES[idx % FALLBACK_IMAGES.length] || "/hero/1.jpg"
+  );
+}
+
 export default function NewsSection({
   items = [
     {
@@ -58,7 +73,7 @@ export default function NewsSection({
       image: "/hero/4.jpg",
     },
   ] as NewsItem[],
-  href = "/catalog", // временно ведём в каталог
+  href = "/news", // ✅ /news
   title = "Новости",
   subtitle = "Только важное: коллекции, сервис и материалы",
 }: {
@@ -90,7 +105,7 @@ export default function NewsSection({
     const el = cards[i];
     if (!el) return;
 
-    const left = el.offsetLeft - 8; // небольшой отступ
+    const left = el.offsetLeft - 8;
     track.scrollTo({ left, behavior: "smooth" });
     setIndex(i);
   };
@@ -100,7 +115,6 @@ export default function NewsSection({
     if (!track) return;
 
     const onScroll = () => {
-      // определяем ближайшую карточку к левому краю
       const cards = Array.from(
         track.querySelectorAll<HTMLElement>("[data-card]"),
       );
@@ -192,7 +206,7 @@ export default function NewsSection({
               </p>
             </div>
 
-            {/* Actions (всё кликабельно) */}
+            {/* Actions */}
             <div data-head-item className="flex items-center gap-2">
               <button
                 type="button"
@@ -222,11 +236,12 @@ export default function NewsSection({
                 <ChevronRight className="h-5 w-5 text-black/70 transition group-hover:translate-x-0.5" />
               </button>
 
+              {/* ✅ ВСЕ НОВОСТИ -> /news */}
               <Link
                 href={href}
                 className="group ml-2 inline-flex cursor-pointer items-center justify-center rounded-full bg-black px-5 py-3 text-[13px] font-medium tracking-[0.12em] text-white transition hover:opacity-90"
               >
-                В КАТАЛОГ
+                ВСЕ НОВОСТИ
                 <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </div>
@@ -235,7 +250,7 @@ export default function NewsSection({
 
         {/* Track */}
         <div className="relative mt-7">
-          {/* Premium fade edges */}
+          {/* Fade edges (оставляем, они снаружи, не на карточках) */}
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-[linear-gradient(90deg,rgba(255,255,255,1),rgba(255,255,255,0))]" />
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-[linear-gradient(270deg,rgba(255,255,255,1),rgba(255,255,255,0))]" />
 
@@ -246,86 +261,85 @@ export default function NewsSection({
               "scrollbar-hide snap-x snap-mandatory",
             )}
           >
-            {items.map((n, i) => (
-              <Link
-                key={n.id}
-                href={href}
-                data-card
-                className={cn(
-                  "group relative min-w-[290px] max-w-[290px] snap-start cursor-pointer",
-                  "overflow-hidden rounded-[28px] border border-black/10 bg-white",
-                  "shadow-[0_18px_60px_rgba(0,0,0,0.06)] transition",
-                  "hover:-translate-y-0.5 hover:border-black/20",
-                  "active:translate-y-0",
-                  "md:min-w-[360px] md:max-w-[360px]",
-                )}
-                aria-label={`Открыть новость: ${n.title}`}
-              >
-                {/* clickable overlay (на всякий случай, но Link и так кликабельный) */}
-                <span className="absolute inset-0 z-10" />
+            {items.map((n, i) => {
+              const imgSrc = getTmpImage(n, i);
 
-                {/* top media */}
-                <div className="relative h-[170px] w-full overflow-hidden md:h-[190px]">
-                  {/* soft premium background if no image */}
-                  <div className="absolute inset-0 bg-[radial-gradient(700px_260px_at_30%_0%,rgba(0,0,0,0.08),transparent_60%)]" />
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.03),transparent_55%)]" />
-
-                  {n.image ? (
+              return (
+                <Link
+                  key={n.id}
+                  href={href} // ✅ карточка -> /news
+                  data-card
+                  className={cn(
+                    "group relative min-w-[290px] max-w-[290px] snap-start cursor-pointer",
+                    "overflow-hidden rounded-[28px] border border-black/10 bg-white",
+                    "shadow-[0_18px_60px_rgba(0,0,0,0.06)] transition",
+                    "hover:-translate-y-0.5 hover:border-black/20",
+                    "active:translate-y-0",
+                    "md:min-w-[360px] md:max-w-[360px]",
+                  )}
+                  aria-label={`Открыть новость: ${n.title}`}
+                >
+                  {/* top media */}
+                  <div className="relative h-[170px] w-full overflow-hidden md:h-[190px]">
                     <Image
-                      src={n.image}
+                      src={imgSrc}
                       alt={n.title}
                       fill
                       sizes="(max-width: 768px) 290px, 360px"
                       className="object-cover transition-transform duration-700 group-hover:scale-[1.03]"
                       priority={i < 2}
                     />
-                  ) : null}
 
-                  {/* top badges */}
-                  <div className="absolute left-4 top-4 z-20 flex items-center gap-2">
-                    {n.tag ? (
-                      <div className="rounded-full border border-black/10 bg-white/85 px-3 py-1 text-[11px] tracking-[0.18em] text-black/70 backdrop-blur-sm">
-                        {n.tag}
+                    {/* ✅ НИКАКОГО белого засвета: только лёгкий затемняющий низ */}
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-[linear-gradient(180deg,transparent,rgba(0,0,0,0.22))]" />
+
+                    {/* ✅ Apple-style badges: glass/white pill, выраженные */}
+                    <div className="absolute left-4 top-4 z-20 flex items-center gap-2">
+                      {n.tag ? (
+                        <div className="rounded-full border border-white/60 bg-white/70 px-3 py-1 text-[11px] font-medium tracking-[0.18em] text-black/80 shadow-[0_10px_25px_rgba(0,0,0,0.10)] backdrop-blur-md">
+                          {n.tag}
+                        </div>
+                      ) : null}
+
+                      <div className="rounded-full border border-white/50 bg-white/55 px-3 py-1 text-[11px] font-medium tracking-[0.18em] text-black/75 shadow-[0_10px_25px_rgba(0,0,0,0.08)] backdrop-blur-md">
+                        {n.dateLabel}
                       </div>
-                    ) : null}
-
-                    <div className="rounded-full border border-black/10 bg-black/[0.03] px-3 py-1 text-[11px] tracking-[0.18em] text-black/70">
-                      {n.dateLabel}
                     </div>
                   </div>
 
-                  {/* subtle shine */}
-                  <div className="pointer-events-none absolute -left-10 -top-10 h-44 w-44 rounded-full bg-black/[0.04] opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-                </div>
-
-                {/* content */}
-                <div className="relative p-5">
-                  <div className="text-[11px] tracking-[0.18em] text-black/45">
-                    НОВОСТЬ {String(i + 1).padStart(2, "0")}
-                  </div>
-
-                  <div className="mt-2 text-[16px] font-semibold leading-[1.15] tracking-[-0.01em] text-black/85">
-                    {n.title}
-                  </div>
-
-                  <p className="mt-2 text-[13px] leading-6 text-black/65">
-                    {n.excerpt}
-                  </p>
-
-                  {/* footer row (тоже кликабельно — внутри Link) */}
-                  <div className="mt-5 flex items-center justify-between">
-                    <div className="text-[12px] tracking-[0.18em] text-black/45">
-                      ОТКРЫТЬ
+                  {/* content */}
+                  <div className="relative p-5">
+                    <div className="text-[11px] tracking-[0.18em] text-black/45">
+                      НОВОСТЬ {String(i + 1).padStart(2, "0")}
                     </div>
 
-                    <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2 text-[12px] font-medium tracking-[0.12em] text-black/75 transition group-hover:border-black/20">
-                      Читать
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                    <div className="mt-2 text-[16px] font-semibold leading-[1.15] tracking-[-0.01em] text-black/85">
+                      {n.title}
+                    </div>
+
+                    <p className="mt-2 text-[13px] leading-6 text-black/65">
+                      {n.excerpt}
+                    </p>
+
+                    <div className="mt-5 flex items-center justify-between">
+                      <div className="text-[12px] tracking-[0.18em] text-black/45">
+                        ОТКРЫТЬ
+                      </div>
+
+                      {/* ✅ "Читать" -> /news (и не даём всплывать клику) */}
+                      <Link
+                        href={href}
+                        className="relative z-20 inline-flex cursor-pointer items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2 text-[12px] font-medium tracking-[0.12em] text-black/75 transition hover:border-black/20"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Читать
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </Link>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
           </div>
         </div>
 
@@ -356,6 +370,7 @@ export default function NewsSection({
             })}
           </div>
 
+          {/* ✅ ВСЕ НОВОСТИ -> /news */}
           <Link
             href={href}
             className="inline-flex cursor-pointer items-center gap-2 text-[12px] tracking-[0.18em] text-black/60 transition hover:text-black"
