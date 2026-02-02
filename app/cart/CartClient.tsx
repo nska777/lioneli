@@ -52,7 +52,7 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
       src={src}
       alt={alt}
       fill
-      className="object-cover"
+      className="object-contain"
       sizes="96px"
       onError={() => setBroken(true)}
     />
@@ -62,10 +62,76 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
 type VariantAny = {
   id: string;
   title?: string;
+  group?: string;
   priceDeltaRUB?: number;
   priceDeltaUZS?: number;
   image?: string;
+  gallery?: string[];
 };
+
+/**
+ * ✅ Разбираем composite variantId из корзины:
+ * - "base" => нет варианта
+ * - "color:white" => один вариант
+ * - "color:white|option:lift" => несколько вариантов (по группам)
+ *
+ * Возвращаем:
+ * - title: "Белая, С подъёмным механизмом"
+ * - image: gallery[0] или image выбранного варианта (приоритет)
+ */
+function parseCompositeVariantForCart(
+  variantId: string,
+  variants: VariantAny[],
+) {
+  const raw = String(variantId ?? "").trim();
+  if (!raw || raw === "base") {
+    return { title: null as string | null, image: null as string | null };
+  }
+
+  const parts = raw
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const picked: VariantAny[] = [];
+
+  for (const part of parts) {
+    // ожидаем "group:id"
+    if (part.includes(":")) {
+      const [g, id] = part.split(":");
+      const group = String(g ?? "").trim();
+      const vid = String(id ?? "").trim();
+      if (!vid) continue;
+
+      // сначала пробуем найти по id + group, потом просто по id
+      const found =
+        variants.find(
+          (v) =>
+            String(v.id) === vid &&
+            (group ? String(v.group ?? "") === group : true),
+        ) ?? variants.find((v) => String(v.id) === vid);
+
+      if (found) picked.push(found);
+      continue;
+    }
+
+    // фолбэк: если вдруг пришёл просто "white"
+    const found = variants.find((v) => String(v.id) === part);
+    if (found) picked.push(found);
+  }
+
+  const title = picked
+    .map((v) => (v.title ? String(v.title).trim() : ""))
+    .filter(Boolean)
+    .join(", ");
+
+  const image =
+    picked.find((v) => Array.isArray(v.gallery) && v.gallery.length)
+      ?.gallery?.[0] ??
+    picked.find((v) => !!v.image)?.image ??
+    null;
+
+  return { title: title || null, image };
+}
 
 export default function CartClient() {
   const router = useRouter();
@@ -104,23 +170,49 @@ export default function CartClient() {
           ? ((p as any).variants as VariantAny[])
           : [];
 
-        const variant =
-          variantId && variantId !== "base"
-            ? (variants.find((v) => String(v.id) === String(variantId)) ?? null)
-            : null;
+        // ✅ NEW: корректно парсим composite variantId
+        const parsed = parseCompositeVariantForCart(
+          String(variantId),
+          variants,
+        );
 
-        const deltaRaw =
-          region === "uz"
-            ? Number(variant?.priceDeltaUZS ?? 0)
-            : Number(variant?.priceDeltaRUB ?? 0);
+        // ✅ delta: суммируем по всем выбранным вариантам (если их несколько)
+        // Для совместимости:
+        // - если variantId не composite, всё равно корректно посчитается
+        const pickedForDelta: VariantAny[] = [];
+        const raw = String(variantId ?? "").trim();
+        if (raw && raw !== "base") {
+          const parts = raw
+            .split("|")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          for (const part of parts) {
+            if (part.includes(":")) {
+              const [, id] = part.split(":");
+              const vid = String(id ?? "").trim();
+              const found = variants.find((v) => String(v.id) === vid);
+              if (found) pickedForDelta.push(found);
+            } else {
+              const found = variants.find((v) => String(v.id) === part);
+              if (found) pickedForDelta.push(found);
+            }
+          }
+        }
 
-        const delta = Number(deltaRaw ?? 0) || 0;
+        const delta = pickedForDelta.reduce((acc, v) => {
+          const d =
+            region === "uz"
+              ? Number(v?.priceDeltaUZS ?? 0)
+              : Number(v?.priceDeltaRUB ?? 0);
+          return acc + (Number(d ?? 0) || 0);
+        }, 0);
 
         const unit = baseUnit + delta;
-        const variantTitle = variant?.title ? String(variant.title) : null;
+        const variantTitle = parsed.title;
 
+        // ✅ картинка: variant.gallery[0] -> variant.image -> base image
         const image =
-          (variant?.image ? String(variant.image) : "") || (p as any).image;
+          (parsed.image ? String(parsed.image) : "") || (p as any).image;
 
         // ✅ коллекция (brand)
         const brandSlug = String((p as any).brand ?? "");
@@ -269,6 +361,7 @@ export default function CartClient() {
                           {it.product.title}
                         </Link>
 
+                        {/* ✅ Вариант теперь корректно показывается и для composite */}
                         {it.variantTitle && it.variantId !== "base" ? (
                           <div className="mt-1 text-[12px] text-black/55">
                             Вариант:{" "}

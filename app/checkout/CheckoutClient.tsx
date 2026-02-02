@@ -54,6 +54,7 @@ function safeParse<T>(raw: string | null, fallback: T): T {
 type VariantAny = {
   id: string;
   title?: string;
+  group?: string;
   priceDeltaRUB?: number;
   priceDeltaUZS?: number;
 };
@@ -67,6 +68,80 @@ function labelByBrandSlug(slug: string | null | undefined) {
   return found ? found.title : s.toUpperCase();
 }
 
+/**
+ * ✅ НОВОЕ:
+ * variantId в корзине у тебя теперь composite:
+ * "color:white|option:lift" и т.п.
+ * Нужно:
+ * - распарсить части
+ * - найти каждый вариант в variants[]
+ * - посчитать суммарную дельту
+ * - собрать красивый variantTitle
+ */
+function parseCompositeVariant(
+  variantId: string,
+  variants: VariantAny[],
+  region: "uz" | "ru",
+) {
+  const raw = String(variantId ?? "").trim();
+
+  if (!raw || raw === "base") {
+    return { delta: 0, title: null as string | null };
+  }
+
+  // если вдруг пришёл одиночный id (без | и без group:)
+  const isComposite = raw.includes("|") || raw.includes(":");
+
+  const parts = isComposite ? raw.split("|") : [raw];
+
+  const picked: VariantAny[] = [];
+
+  for (const p of parts) {
+    const s = String(p).trim();
+    if (!s) continue;
+
+    // ожидаем "group:id"
+    if (s.includes(":")) {
+      const [g, id] = s.split(":");
+      const group = String(g ?? "").trim();
+      const vid = String(id ?? "").trim();
+      if (!vid) continue;
+
+      // group может быть, может не быть — ищем максимально аккуратно
+      const found =
+        variants.find(
+          (v) =>
+            String(v.id) === vid &&
+            (group ? String(v.group ?? "") === group : true),
+        ) ?? variants.find((v) => String(v.id) === vid);
+
+      if (found) picked.push(found);
+      continue;
+    }
+
+    // fallback: просто id
+    const found = variants.find((v) => String(v.id) === s);
+    if (found) picked.push(found);
+  }
+
+  const delta = picked.reduce((acc, v) => {
+    const d =
+      region === "uz"
+        ? Number(v.priceDeltaUZS ?? 0) || 0
+        : Number(v.priceDeltaRUB ?? 0) || 0;
+    return acc + d;
+  }, 0);
+
+  const titles = picked
+    .map((v) => (v.title ? String(v.title).trim() : ""))
+    .filter(Boolean);
+
+  return {
+    delta,
+    title: titles.length ? titles.join(", ") : null,
+  };
+}
+
 export default function CheckoutClient() {
   const router = useRouter();
   const sp = useSearchParams();
@@ -75,7 +150,6 @@ export default function CheckoutClient() {
   const { region } = useRegionLang();
   const shop = useShopState();
 
-  // ✅ умная кнопка "назад": back, но если зашли напрямую — в корзину
   const goBack = () => {
     if (typeof window === "undefined") return;
     if (window.history.length > 1) router.back();
@@ -133,7 +207,6 @@ export default function CheckoutClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ===== items source =====
   const cart = shop.cart ?? {};
   const cartKeys = useMemo(
     () => Object.keys(cart).filter((k) => (cart[k] ?? 0) > 0),
@@ -170,7 +243,6 @@ export default function CheckoutClient() {
     return keys
       .map((key) => {
         const k = String(key);
-
         const { productId, variantId } = shop.parseKey(k);
 
         const p = CATALOG_BY_ID.get(String(productId));
@@ -187,18 +259,16 @@ export default function CheckoutClient() {
           ? ((p as any).variants as VariantAny[])
           : [];
 
-        const variant =
-          variantId && variantId !== "base"
-            ? (variants.find((v) => String(v.id) === String(variantId)) ?? null)
-            : null;
-
-        const delta =
-          region === "uz"
-            ? Number(variant?.priceDeltaUZS ?? 0) || 0
-            : Number(variant?.priceDeltaRUB ?? 0) || 0;
+        // ✅ ВАЖНО: считаем delta + title по composite variantId
+        const parsed = parseCompositeVariant(
+          String(variantId),
+          variants,
+          region,
+        );
+        const delta = parsed.delta;
+        const variantTitle = parsed.title;
 
         const unit = Number(baseUnit || 0) + Number(delta || 0);
-        const variantTitle = variant?.title ? String(variant.title) : null;
 
         const brandSlug = String((p as any).brand ?? "");
         const collectionLabel = labelByBrandSlug(brandSlug);
@@ -209,6 +279,7 @@ export default function CheckoutClient() {
           variantId: String(variantId),
           variantTitle,
           title: String((p as any).title ?? ""),
+          image: String((p as any).image ?? ""), // ✅ пригодится для TG фото
           collectionSlug: brandSlug || null,
           collectionLabel,
           qty,
@@ -222,6 +293,7 @@ export default function CheckoutClient() {
       variantId: string;
       variantTitle: string | null;
       title: string;
+      image: string;
       collectionSlug: string | null;
       collectionLabel: string | null;
       qty: number;
@@ -265,8 +337,14 @@ export default function CheckoutClient() {
           id: it.productId,
           collection: it.collectionSlug || undefined,
           collectionLabel: it.collectionLabel || undefined,
+
+          // ✅ важно: сохраняем composite id + красивый title
           variantId: it.variantId,
           variantTitle: it.variantTitle || undefined,
+
+          // ✅ добавим image (потом можно отправлять фото в TG)
+          image: it.image || undefined,
+
           qty: it.qty,
           unit: it.unit,
           sum: it.sum,
@@ -342,7 +420,6 @@ export default function CheckoutClient() {
 
   return (
     <main className="mx-auto w-full max-w-[1200px] px-4 py-10">
-      {/* ✅ Кнопка назад */}
       <button
         type="button"
         onClick={goBack}
@@ -365,7 +442,6 @@ export default function CheckoutClient() {
       </div>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_380px]">
-        {/* ✅ ТВОЯ ФОРМА КАК БЫЛА */}
         <section className="rounded-3xl border border-black/10 bg-white p-5">
           <div className="text-base font-semibold">Данные клиента</div>
 
@@ -420,7 +496,6 @@ export default function CheckoutClient() {
           )}
         </section>
 
-        {/* summary */}
         <aside className="h-fit rounded-3xl border border-black/10 bg-white p-5">
           <div className="text-base font-semibold">Ваш заказ</div>
 
