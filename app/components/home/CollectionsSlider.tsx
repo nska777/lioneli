@@ -477,14 +477,17 @@ export default function CollectionsSlider({
                         onClick={() => setOpenHotspotId(null)}
                       >
                         <div className="flex gap-3">
-                          <div className="relative h-[64px] w-[92px] overflow-hidden rounded-xl bg-black/[0.03] ring-1 ring-black/10">
+                          <div className="relative h-[64px] w-[92px] overflow-hidden rounded-xl bg-white ring-1 ring-black/10">
                             <Image
                               src={activeProduct.image}
                               alt={activeProduct.title}
                               fill
                               sizes="92px"
-                              className="object-cover"
+                              className="object-contain p-1.5"
                             />
+
+                            {/* мягкий “стеклянный” подиум снизу (очень subtle) */}
+                            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-black/[0.04] to-transparent" />
                           </div>
 
                           <div className="min-w-0 flex-1">

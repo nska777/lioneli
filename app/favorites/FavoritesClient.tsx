@@ -13,6 +13,38 @@ import { CATALOG_BY_ID, CATALOG_MOCK } from "../lib/mock/catalog-products";
 const cn = (...s: Array<string | false | null | undefined>) =>
   s.filter(Boolean).join(" ");
 
+/* ================= Stable random helpers ================= */
+
+function hashString(input: string) {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function mulberry32(seed: number) {
+  return function () {
+    let t = (seed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededShuffle<T>(arr: T[], seed: number) {
+  const a = arr.slice();
+  const rnd = mulberry32(seed);
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/* ================= Utils ================= */
+
 function formatMoney(n: number, region: "uz" | "ru") {
   if (region === "uz") return new Intl.NumberFormat("ru-RU").format(n) + " сум";
   return new Intl.NumberFormat("ru-RU").format(n) + " ₽";
@@ -118,10 +150,28 @@ export default function FavoritesClient() {
     }>;
   }, [favKeys, region, shop]);
 
-  // рекомендации: 3 товара, которых нет в избранном (по productId)
+  // ✅ РЕКОМЕНДАЦИИ: 3 товара, которых нет в избранном (по productId) — теперь рандомно
   const recommended = useMemo(() => {
     const set = new Set(favKeys.map((k) => shop.parseKey(String(k)).productId));
-    return CATALOG_MOCK.filter((p) => !set.has(String(p.id))).slice(0, 3);
+    const pool = CATALOG_MOCK.filter((p) => !set.has(String(p.id)));
+
+    // seed зависит от набора кандидатов, хранится в sessionStorage — не прыгает
+    const ids = pool.map((x) => String(x.id)).join("|");
+    const seedKey = `lioneto:favorites:recommended:${hashString(ids)}`;
+
+    let seed = 1;
+    try {
+      const stored = sessionStorage.getItem(seedKey);
+      if (stored) seed = Number(stored) || 1;
+      else {
+        seed = Math.floor(Math.random() * 1_000_000_000) + 1;
+        sessionStorage.setItem(seedKey, String(seed));
+      }
+    } catch {
+      seed = hashString(seedKey) || 1;
+    }
+
+    return seededShuffle(pool, seed).slice(0, 3);
   }, [favKeys, shop]);
 
   const clearFavorites = () => {
