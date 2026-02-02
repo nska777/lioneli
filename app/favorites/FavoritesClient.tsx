@@ -1,7 +1,7 @@
 // app/favorites/FavoritesClient.tsx
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, HeartOff, ShoppingBag, Trash2 } from "lucide-react";
@@ -150,8 +150,14 @@ export default function FavoritesClient() {
     }>;
   }, [favKeys, region, shop]);
 
-  // ✅ РЕКОМЕНДАЦИИ: 3 товара, которых нет в избранном (по productId) — теперь рандомно
-  const recommended = useMemo(() => {
+  // ✅ РЕКОМЕНДАЦИИ (FIX hydration):
+  // Рандом + sessionStorage нельзя считать в SSR/первом рендере,
+  // поэтому считаем только после mount на клиенте.
+  const [recommended, setRecommended] = useState<
+    Array<(typeof CATALOG_MOCK)[number]>
+  >([]);
+
+  useEffect(() => {
     const set = new Set(favKeys.map((k) => shop.parseKey(String(k)).productId));
     const pool = CATALOG_MOCK.filter((p) => !set.has(String(p.id)));
 
@@ -171,7 +177,7 @@ export default function FavoritesClient() {
       seed = hashString(seedKey) || 1;
     }
 
-    return seededShuffle(pool, seed).slice(0, 3);
+    setRecommended(seededShuffle(pool, seed).slice(0, 3));
   }, [favKeys, shop]);
 
   const clearFavorites = () => {
