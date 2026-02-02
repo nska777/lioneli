@@ -13,6 +13,7 @@ import {
   Mail,
   MapPin,
 } from "lucide-react";
+import Image from "next/image";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -66,9 +67,9 @@ export default function Footer({ data }: { data?: FooterData }) {
       data ?? {
         brand: {
           title: "LIONETO",
-          tagline: "Premium textiles & interior",
+          tagline: "Premium interior",
           description:
-            "Премиальные шторы, текстиль и интерьерные решения для домов, отелей и коммерческих пространств.",
+            "Премиальная мебель для современных интерьеров и коммерческих пространств.",
         },
         columns: [
           {
@@ -126,29 +127,84 @@ export default function Footer({ data }: { data?: FooterData }) {
     );
   }, [data]);
 
-  /* ================= GSAP ================= */
+  /* ================= GSAP (FIXED) ================= */
 
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
 
-    const ctx = gsap.context(() => {
-      gsap.set("[data-ft-reveal]", { autoAlpha: 0, y: 14 });
+    // prefers-reduced-motion: не прячем контент
+    const reduceMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
 
-      ScrollTrigger.create({
+    const ctx = gsap.context(() => {
+      const targets = gsap.utils.toArray<HTMLElement>("[data-ft-reveal]");
+      if (!targets.length) return;
+
+      // Всегда сначала выставляем начальное состояние
+      if (!reduceMotion) {
+        gsap.set(targets, { autoAlpha: 0, y: 14 });
+      } else {
+        gsap.set(targets, { autoAlpha: 1, y: 0 });
+        return;
+      }
+
+      let revealed = false;
+
+      const reveal = () => {
+        if (revealed) return;
+        revealed = true;
+
+        gsap.to(targets, {
+          autoAlpha: 1,
+          y: 0,
+          duration: 0.9,
+          ease: "power3.out",
+          stagger: 0.07,
+          overwrite: true,
+        });
+      };
+
+      // Создаём триггер
+      const st = ScrollTrigger.create({
         trigger: root,
         start: "top 90%",
         once: true,
-        onEnter: () => {
-          gsap.to("[data-ft-reveal]", {
-            autoAlpha: 1,
-            y: 0,
-            duration: 0.9,
-            ease: "power3.out",
-            stagger: 0.07,
-          });
+        onEnter: reveal,
+
+        // Ключевое: если позиции пересчитались и футер уже в зоне — показываем
+        onRefresh: () => {
+          const r = root.getBoundingClientRect();
+          const vh = window.innerHeight || 0;
+          const inView = r.top < vh * 0.9;
+          if (inView) reveal();
         },
       });
+
+      // Ещё один страховочный чек: если футер уже виден в момент инициализации
+      // (например, при восстановлении scroll позиции или быстром скролле)
+      requestAnimationFrame(() => {
+        const r = root.getBoundingClientRect();
+        const vh = window.innerHeight || 0;
+        const inView = r.top < vh * 0.9;
+        if (inView) reveal();
+      });
+
+      // Очень важно для страниц с картинками/слайдерами выше:
+      // после полной загрузки пересчитать ScrollTrigger
+      const onLoad = () => {
+        ScrollTrigger.refresh();
+      };
+      window.addEventListener("load", onLoad, { once: true });
+
+      // И ещё один refresh через кадр — ловит layout shift сразу после маунта
+      requestAnimationFrame(() => ScrollTrigger.refresh());
+
+      return () => {
+        window.removeEventListener("load", onLoad);
+        st.kill();
+      };
     }, root);
 
     return () => ctx.revert();
@@ -157,14 +213,23 @@ export default function Footer({ data }: { data?: FooterData }) {
   /* ================= JSX ================= */
 
   return (
-    <footer ref={rootRef} className=" bg-black text-white" aria-label="Footer">
+    <footer ref={rootRef} className="bg-black text-white" aria-label="Footer">
       <div className="mx-auto w-full max-w-[1200px] px-4">
         {/* TOP */}
         <div className="grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-4">
           {/* BRAND */}
           <div data-ft-reveal className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-2xl border border-white/15 bg-white/5" />
+              <div className="relative h-25 w-25 overflow-hidden rounded-full">
+                <Image
+                  src="/logo-lioneto.svg"
+                  alt="Lioneto"
+                  fill
+                  className="object-contain p-1"
+                  priority={false}
+                />
+              </div>
+
               <div>
                 <div className="text-[14px] font-semibold tracking-[0.26em]">
                   {footerData.brand.title}
