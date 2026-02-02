@@ -18,7 +18,8 @@ export async function wishlistUpsert(productId: string, snapshot: WishlistSnapsh
       { onConflict: "user_id,product_id" }
     );
 
-  if (error) return { ok: false as const, reason: error.message as const };
+  if (error) return { ok: false as const, reason: error.message };
+
   return { ok: true as const };
 }
 
@@ -33,7 +34,8 @@ export async function wishlistRemove(productId: string) {
     .eq("user_id", userId)
     .eq("product_id", String(productId));
 
-  if (error) return { ok: false as const, reason: error.message as const };
+  if (error) return { ok: false as const, reason: error.message };
+
   return { ok: true as const };
 }
 

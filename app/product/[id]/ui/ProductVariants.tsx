@@ -394,8 +394,8 @@ export default function ProductVariants({
       const g = cleaned.find((x) => x.group === key)!;
       const items = [...g.items];
 
-      if (key === "size") items.sort(sortSize);
-      else if (key === "mechanism") items.sort(sortMechanism);
+      if (key === "size") (items as any[]).sort(sortSize as any);
+      else if (key === "mechanism") (items as any[]).sort(sortMechanism as any);
       else
         items.sort((a, b) =>
           String(a.title).localeCompare(String(b.title), "ru"),
@@ -440,19 +440,19 @@ export default function ProductVariants({
                 {g.items.map((v) => {
                   const active = v.id === selectedId;
                   const disabled = !!v.disabled;
-                  const d = deltaOf(v, currency);
+                  const d = deltaOf(v as any, currency);
 
-                  const title = isLift(v)
+                  const title = isLift(v as any)
                     ? "С подъёмным механизмом"
-                    : isBase(v)
+                    : isBase(v as any)
                       ? "Без подъёмного механизма"
-                      : v.title;
+                      : String(v.title);
 
-                  const subtitle = isLift(v)
+                  const subtitle = isLift(v as any)
                     ? "Доступ к хранению внутри"
-                    : isBase(v)
+                    : isBase(v as any)
                       ? "Классическое основание"
-                      : "Выбор модификации";
+                      : "";
 
                   return (
                     <MechanismCard
@@ -463,7 +463,7 @@ export default function ProductVariants({
                       disabled={disabled}
                       delta={d}
                       currency={currency}
-                      onClick={() => pick(g.group, v)}
+                      onClick={() => pick(g.group, v as any)}
                     />
                   );
                 })}
@@ -477,14 +477,14 @@ export default function ProductVariants({
                   const active = v.id === selectedId;
                   const disabled = !!v.disabled;
 
-                  const d = deltaOf(v, currency);
+                  const d = deltaOf(v as any, currency);
                   const token = getColorToken(v.title);
 
                   return (
                     <button
                       key={v.id}
                       type="button"
-                      onClick={() => pick(g.group, v)}
+                      onClick={() => pick(g.group, v as any)}
                       disabled={disabled}
                       aria-pressed={active}
                       aria-disabled={disabled}
@@ -559,15 +559,14 @@ export default function ProductVariants({
                 {g.items.map((v) => {
                   const active = v.id === selectedId;
                   const disabled = !!v.disabled;
-                  const d = deltaOf(v, currency);
-
+                  const d = deltaOf(v as any, currency);
                   return (
                     <PremiumPillButton
                       key={v.id}
                       title={v.title}
                       active={active}
                       disabled={disabled}
-                      onClick={() => pick(g.group, v)}
+                      onClick={() => pick(g.group, v as any)}
                       right={
                         d !== 0 ? (
                           <DeltaBadge

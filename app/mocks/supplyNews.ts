@@ -1,6 +1,5 @@
-import type { SupplyNewsItem } from "../components/home/SupplyNewsSection";
 
-export const supplyNewsMock: SupplyNewsItem[] = [
+export const supplyNewsMock: any[] = [
   {
     id: "supply-1",
     type: "arrival",

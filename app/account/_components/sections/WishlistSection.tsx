@@ -91,7 +91,7 @@ export default function WishlistSection({ userId }: { userId: string }) {
 
                   {p ? (
                     <div className="mt-1 text-[12px] text-black/55">
-                      {fmtPrice(p.price_rub, p.price_uzs)}
+                      {fmtPrice(p.price_rub ?? 0, p.price_uzs ?? 0)}
                     </div>
                   ) : (
                     <div className="mt-1 text-[12px] text-black/45">

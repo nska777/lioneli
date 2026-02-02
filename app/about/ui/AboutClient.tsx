@@ -63,10 +63,10 @@ export default function AboutClient() {
 
   // region
   const { region } = useRegionLang();
-  const regionKey = (region === "UZ" ? "uz" : "ru") as "uz" | "ru";
+
+  const regionKey: "uz" | "ru" = region === "uz" ? "uz" : "ru";
   const regionLabel = regionKey === "uz" ? "Узбекистан" : "Россия";
   const phonePrefix = regionKey === "uz" ? "+998" : "+7";
-
   const [active, setActive] = useState(0);
   const prevActiveRef = useRef(0);
 
@@ -749,9 +749,6 @@ export default function AboutClient() {
       <CallModal
         open={callOpen}
         onClose={() => setCallOpen(false)}
-        regionLabel={regionLabel}
-        phonePrefix={phonePrefix}
-        regionKey={regionKey}
         onSubmit={(data) => {
           console.log("CALL MODAL SUBMIT:", data);
         }}

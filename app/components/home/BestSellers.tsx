@@ -274,7 +274,9 @@ export default function BestSellers({
           filter: "blur(0px)",
           duration: 0.28,
           ease: "power3.out",
-          onStart: () => (actions.style.pointerEvents = "auto"),
+          onStart: () => {
+            actions.style.pointerEvents = "auto";
+          },
         });
       };
 
@@ -290,7 +292,9 @@ export default function BestSellers({
           filter: "blur(8px)",
           duration: 0.22,
           ease: "power2.out",
-          onComplete: () => (actions.style.pointerEvents = "none"),
+          onComplete: () => {
+            actions.style.pointerEvents = "none";
+          },
         });
       };
 

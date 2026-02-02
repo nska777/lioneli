@@ -362,7 +362,7 @@ export default function FavoritesClient() {
                   </div>
                   <div className="text-xs text-black/45">
                     {formatMoney(
-                      region === "uz" ? p.price_uzs : p.price_rub,
+                      (region === "uz" ? p.price_uzs : p.price_rub) ?? 0,
                       region,
                     )}
                   </div>

@@ -254,13 +254,14 @@ export const megaCategories: MegaCategory[] = [
    Картинки лежат в /public/mega/...
 ========================= */
 
-export type MegaPreview = {
+type MegaPreview = {
   titleKey: string;
   fallback: string;
   main: string;
-  a: string;
-  b: string;
+  a?: string;
+  b?: string;
 };
+
 
 export const MEGA_PREVIEWS: Record<string, MegaPreview> = {
   // СПАЛЬНИ

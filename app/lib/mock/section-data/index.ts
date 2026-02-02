@@ -1,10 +1,8 @@
 // app/lib/mock/section-data/index.ts
 import type {
   CollectionKey,
-  CollectionMeta,
   CollectionScene,
   SceneVariantKey,
-  SectionCollectionsMap,
   SectionKey,
 } from "./types";
 
@@ -24,7 +22,7 @@ export const ALL_SCENES: CollectionScene[] = [
 /**
  * ✅ Метаданные коллекций
  */
-export const COLLECTIONS_META: Record<CollectionKey, CollectionMeta> = {
+export const COLLECTIONS_META: Record<CollectionKey, any> = {
   amber: { key: "amber", label: "AMBER" },
   buongiorno: { key: "buongiorno", label: "BUONGIORNO", hasVariants: true },
   elizabeth: { key: "elizabeth", label: "ELIZABETH" },
@@ -36,7 +34,7 @@ export const COLLECTIONS_META: Record<CollectionKey, CollectionMeta> = {
 /**
  * ✅ Какие коллекции есть в каждом разделе
  */
-export const SECTION_COLLECTIONS: SectionCollectionsMap = {
+export const SECTION_COLLECTIONS: any = {
   bedrooms: ["amber", "buongiorno", "elizabeth", "pitti", "salvador", "scandi"],
   living: ["buongiorno", "pitti", "salvador", "scandi"],
   youth: ["elizabeth", "scandi"],

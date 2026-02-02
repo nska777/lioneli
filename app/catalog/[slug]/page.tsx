@@ -15,6 +15,14 @@ function parseCollectionSlug(slug: string) {
   return { brand: m[1], category: m[2] };
 }
 
+// ✅ минимальный safe-reader для объектов из headerData (без правок типов)
+function pickLabel(obj: unknown): string | undefined {
+  if (!obj || typeof obj !== "object") return undefined;
+  const o = obj as Record<string, unknown>;
+  const v = o.label ?? o.title ?? o.name;
+  return typeof v === "string" ? v : undefined;
+}
+
 // ✅ детерминированный "рандом" (4 модуля не прыгают)
 function xfnv1a(str: string) {
   let h = 2166136261 >>> 0;
@@ -61,11 +69,12 @@ export default async function CatalogSlugPage({
     .find((x) => x.it.href === href);
 
   const categoryLabel =
-    found?.cat.label ?? titleCase(parsed.category ?? "Категория");
-  const collectionLabel =
-    found?.it.label ?? titleCase(parsed.brand ?? "Коллекция");
+    pickLabel(found?.cat) ?? titleCase(parsed.category ?? "Категория");
 
-  const preview = MEGA_PREVIEWS[href];
+  const collectionLabel =
+    pickLabel(found?.it) ?? titleCase(parsed.brand ?? "Коллекция");
+
+  const preview = MEGA_PREVIEWS[href] as unknown;
   const collectionId = `col-${parsed.brand}-${parsed.category}`;
 
   // ✅ строго: только модули этой витрины
@@ -85,7 +94,19 @@ export default async function CatalogSlugPage({
     Number(showcase?.price_rub ?? 0) ||
     Math.min(...modulesAll.map((x) => Number(x.price_rub ?? 0)));
 
-  const gallery = [preview?.main, preview?.a, preview?.b, modulesAll[0]?.image]
+  // gallery sources (preview + fallback)
+  const previewMain =
+    (preview && typeof preview === "object"
+      ? (preview as any).main
+      : undefined) ?? undefined;
+
+  const previewA =
+    preview && typeof preview === "object" ? (preview as any).a : undefined;
+
+  const previewB =
+    preview && typeof preview === "object" ? (preview as any).b : undefined;
+
+  const gallery = [previewMain, previewA, previewB, modulesAll[0]?.image]
     .filter(Boolean)
     .map(String);
 
@@ -94,11 +115,11 @@ export default async function CatalogSlugPage({
 
   const product = {
     id: collectionId,
-    title: preview?.title ?? `Коллекция «${collectionLabel}»`,
+    title: pickLabel(preview) ?? `Коллекция «${collectionLabel}»`,
     badge: "Коллекция",
     href,
     sku: collectionId.toUpperCase(),
-    image: preview?.main || modulesAll[0].image,
+    image: (previewMain as any) || modulesAll[0].image,
     gallery: gallery.length ? gallery : [modulesAll[0].image],
 
     price_rub,
@@ -115,13 +136,13 @@ export default async function CatalogSlugPage({
     },
 
     related: modules4.map((x) => ({
-      id: String(x.id),
-      title: x.title,
-      image: x.image,
-      price_rub: Number(x.price_rub ?? 0),
-      price_uzs: Number(x.price_uzs ?? 0),
-      href: `/product/${x.id}`,
-      badge: x.badge || "",
+      id: String((x as any).id),
+      title: (x as any).title,
+      image: (x as any).image,
+      price_rub: Number((x as any).price_rub ?? 0),
+      price_uzs: Number((x as any).price_uzs ?? 0),
+      href: `/product/${(x as any).id}`,
+      badge: (x as any).badge || "",
     })),
 
     brand: parsed.brand,

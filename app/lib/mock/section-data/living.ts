@@ -64,7 +64,7 @@ export const LIVING_SCENES: CollectionScene[] = [
   {
     id: "scene-living-scandi-white",
     section: "living",
-    collection: "scandy",
+    collection: "scandi",
     variant: "white",
     title: "Гостиная",
     badge: "SCANDY • белый",
@@ -76,7 +76,7 @@ export const LIVING_SCENES: CollectionScene[] = [
   {
     id: "scene-living-scandi-cappuccino",
     section: "living",
-    collection: "scandy",
+    collection: "scandi",
     variant: "cappuccino",
     title: "Гостиная",
     badge: "SCANDY • капучино",

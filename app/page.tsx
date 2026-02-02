@@ -29,11 +29,7 @@ export default async function Page() {
       <BestPrice />
       <AboutCompany />
 
-      <CollectionsSlider
-        collections={COLLECTIONS_SLIDER_MOCK}
-        autoplayMs={7500}
-        imageAutoplayMs={2600}
-      />
+      <CollectionsSlider collections={COLLECTIONS_SLIDER_MOCK} />
 
       <SupplyNewsSection items={supplyNewsMock} />
       <NewsletterCta backgroundUrl="/images/home/newsletter-bg.jpg" />

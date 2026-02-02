@@ -262,7 +262,8 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
       basePath: "/products/scandi/vitrini/1d-glass",
       countForAlt: 1,
     }),
-    attrs: { doors: 1, facade: "glass" },
+    attrs: { doors: 1, facade: "combined" },
+
   }),
   makeProduct({
     id: "scandi-vitrini-1d-glass-shelves",
@@ -278,7 +279,8 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
       basePath: "/products/scandi/vitrini/1d-glass-shelves",
       countForAlt: 1,
     }),
-    attrs: { doors: 1, facade: "glass-shelves" },
+    attrs: { doors: 1, facade: "combined" },
+
   }),
 
   makeProduct({
@@ -311,7 +313,8 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
       basePath: "/products/scandi/vitrini/2d-glass",
       countForAlt: 1,
     }),
-    attrs: { doors: 2, facade: "glass" },
+    attrs: { doors: 2, facade: "combined" },
+
   }),
   makeProduct({
     id: "scandi-vitrini-2d-glass-shelves",
@@ -327,7 +330,7 @@ export const SCANDI_PRODUCTS: CatalogProduct[] = [
       basePath: "/products/scandi/vitrini/2d-glass-shelves",
       countForAlt: 1,
     }),
-    attrs: { doors: 2, facade: "glass-shelves" },
+    attrs: { doors: 2, facade: "combined" },
   }),
 
   // =========================

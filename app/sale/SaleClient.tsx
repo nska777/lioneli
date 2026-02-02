@@ -338,8 +338,9 @@ export default function SaleClient() {
                 autoAlpha: 1,
                 duration: 0.9,
                 ease: "power3.out",
-                onComplete: () =>
-                  gsap.set(sheen, { autoAlpha: 0, xPercent: -160 }),
+                onComplete: () => {
+                  gsap.set(sheen, { autoAlpha: 0, xPercent: -160 });
+                },
               },
             );
           };

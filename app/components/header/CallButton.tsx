@@ -73,7 +73,9 @@ export default function CallButton({
           xPercent: 140,
           duration: 0.85,
           ease: "power3.out",
-          onComplete: () => gsap.set(shimmer, { autoAlpha: 0 }),
+          onComplete: () => {
+            gsap.set(shimmer, { autoAlpha: 0 });
+          },
         });
       };
 

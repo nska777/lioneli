@@ -225,7 +225,7 @@ export default function Header({
           setLang={setLang}
         />
 
-        <CategoryNav categories={megaCategories} />
+        <CategoryNav categories={megaCategories} dict={dict} />
       </header>
 
       <MapModal
