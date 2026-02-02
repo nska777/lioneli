@@ -54,7 +54,6 @@ function safeParse<T>(raw: string | null, fallback: T): T {
 type VariantAny = {
   id: string;
   title?: string;
-  group?: string;
   priceDeltaRUB?: number;
   priceDeltaUZS?: number;
 };
@@ -68,78 +67,37 @@ function labelByBrandSlug(slug: string | null | undefined) {
   return found ? found.title : s.toUpperCase();
 }
 
-/**
- * ✅ НОВОЕ:
- * variantId в корзине у тебя теперь composite:
- * "color:white|option:lift" и т.п.
- * Нужно:
- * - распарсить части
- * - найти каждый вариант в variants[]
- * - посчитать суммарную дельту
- * - собрать красивый variantTitle
- */
-function parseCompositeVariant(
-  variantId: string,
-  variants: VariantAny[],
-  region: "uz" | "ru",
-) {
-  const raw = String(variantId ?? "").trim();
+/** ====== UZ PHONE HELPERS ====== */
+const UZ_PREFIX = "+998 ";
+const UZ_DIGITS = 9;
 
-  if (!raw || raw === "base") {
-    return { delta: 0, title: null as string | null };
-  }
+function onlyDigits(s: string) {
+  return String(s || "").replace(/\D/g, "");
+}
 
-  // если вдруг пришёл одиночный id (без | и без group:)
-  const isComposite = raw.includes("|") || raw.includes(":");
+function formatUzPhone(digits9: string) {
+  // формат: +998 91 123 45 67
+  const d = digits9.slice(0, 9);
+  const p1 = d.slice(0, 2);
+  const p2 = d.slice(2, 5);
+  const p3 = d.slice(5, 7);
+  const p4 = d.slice(7, 9);
 
-  const parts = isComposite ? raw.split("|") : [raw];
+  let out = UZ_PREFIX;
+  if (p1) out += p1;
+  if (p2) out += (p1 ? " " : "") + p2;
+  if (p3) out += (p2 ? " " : p1 ? " " : "") + p3;
+  if (p4) out += (p3 ? " " : p2 ? " " : p1 ? " " : "") + p4;
 
-  const picked: VariantAny[] = [];
+  return out;
+}
 
-  for (const p of parts) {
-    const s = String(p).trim();
-    if (!s) continue;
-
-    // ожидаем "group:id"
-    if (s.includes(":")) {
-      const [g, id] = s.split(":");
-      const group = String(g ?? "").trim();
-      const vid = String(id ?? "").trim();
-      if (!vid) continue;
-
-      // group может быть, может не быть — ищем максимально аккуратно
-      const found =
-        variants.find(
-          (v) =>
-            String(v.id) === vid &&
-            (group ? String(v.group ?? "") === group : true),
-        ) ?? variants.find((v) => String(v.id) === vid);
-
-      if (found) picked.push(found);
-      continue;
-    }
-
-    // fallback: просто id
-    const found = variants.find((v) => String(v.id) === s);
-    if (found) picked.push(found);
-  }
-
-  const delta = picked.reduce((acc, v) => {
-    const d =
-      region === "uz"
-        ? Number(v.priceDeltaUZS ?? 0) || 0
-        : Number(v.priceDeltaRUB ?? 0) || 0;
-    return acc + d;
-  }, 0);
-
-  const titles = picked
-    .map((v) => (v.title ? String(v.title).trim() : ""))
-    .filter(Boolean);
-
-  return {
-    delta,
-    title: titles.length ? titles.join(", ") : null,
-  };
+function getUzDigitsFromInput(v: string) {
+  const raw = String(v || "");
+  const stripped = raw.startsWith(UZ_PREFIX)
+    ? raw.slice(UZ_PREFIX.length)
+    : raw;
+  return onlyDigits(stripped).slice(0, UZ_DIGITS);
 }
 
 export default function CheckoutClient() {
@@ -156,7 +114,7 @@ export default function CheckoutClient() {
     else router.push("/cart");
   };
 
-  const [phone, setPhone] = useState(region === "uz" ? "+998 " : "+7 ");
+  const [phone, setPhone] = useState(region === "uz" ? UZ_PREFIX : "+7 ");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
@@ -164,6 +122,16 @@ export default function CheckoutClient() {
   const [submitting, setSubmitting] = useState(false);
   const [doneOrderId, setDoneOrderId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const uzDigitsCount = useMemo(() => {
+    if (region !== "uz") return 0;
+    return getUzDigitsFromInput(phone).length;
+  }, [phone, region]);
+
+  const isPhoneValid = useMemo(() => {
+    if (region === "uz") return uzDigitsCount === UZ_DIGITS;
+    return phone.trim().length >= 7;
+  }, [region, uzDigitsCount, phone]);
 
   useEffect(() => {
     const c = safeParse<CustomerCache>(localStorage.getItem(LS_CUSTOMER), {});
@@ -173,6 +141,13 @@ export default function CheckoutClient() {
     if (c.comment) setComment(c.comment);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ✅ если UZ — нормализуем телефон (фикс префикс + формат)
+  useEffect(() => {
+    if (region !== "uz") return;
+    setPhone((prev) => formatUzPhone(getUzDigitsFromInput(prev)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [region]);
 
   useEffect(() => {
     let alive = true;
@@ -193,8 +168,12 @@ export default function CheckoutClient() {
 
         const p = prof as ProfileRow | null;
         if (p?.full_name && !name) setName(p.full_name);
-        if (p?.phone_e164 && (!phone || phone.trim().length < 5)) {
-          setPhone(p.phone_e164);
+
+        // ✅ UZ не перетираем странным e164
+        if (region !== "uz") {
+          if (p?.phone_e164 && (!phone || phone.trim().length < 5)) {
+            setPhone(p.phone_e164);
+          }
         }
       } catch {
         // молча
@@ -205,8 +184,9 @@ export default function CheckoutClient() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [region]);
 
+  // ===== items source =====
   const cart = shop.cart ?? {};
   const cartKeys = useMemo(
     () => Object.keys(cart).filter((k) => (cart[k] ?? 0) > 0),
@@ -259,16 +239,18 @@ export default function CheckoutClient() {
           ? ((p as any).variants as VariantAny[])
           : [];
 
-        // ✅ ВАЖНО: считаем delta + title по composite variantId
-        const parsed = parseCompositeVariant(
-          String(variantId),
-          variants,
-          region,
-        );
-        const delta = parsed.delta;
-        const variantTitle = parsed.title;
+        const variant =
+          variantId && variantId !== "base"
+            ? (variants.find((v) => String(v.id) === String(variantId)) ?? null)
+            : null;
+
+        const delta =
+          region === "uz"
+            ? Number(variant?.priceDeltaUZS ?? 0) || 0
+            : Number(variant?.priceDeltaRUB ?? 0) || 0;
 
         const unit = Number(baseUnit || 0) + Number(delta || 0);
+        const variantTitle = variant?.title ? String(variant.title) : null;
 
         const brandSlug = String((p as any).brand ?? "");
         const collectionLabel = labelByBrandSlug(brandSlug);
@@ -279,7 +261,6 @@ export default function CheckoutClient() {
           variantId: String(variantId),
           variantTitle,
           title: String((p as any).title ?? ""),
-          image: String((p as any).image ?? ""), // ✅ пригодится для TG фото
           collectionSlug: brandSlug || null,
           collectionLabel,
           qty,
@@ -293,7 +274,6 @@ export default function CheckoutClient() {
       variantId: string;
       variantTitle: string | null;
       title: string;
-      image: string;
       collectionSlug: string | null;
       collectionLabel: string | null;
       qty: number;
@@ -304,7 +284,7 @@ export default function CheckoutClient() {
 
   const total = useMemo(() => items.reduce((a, b) => a + b.sum, 0), [items]);
 
-  const canSubmit = phone.trim().length >= 7 && items.length > 0 && !submitting;
+  const canSubmit = isPhoneValid && items.length > 0 && !submitting;
 
   async function submit() {
     setError(null);
@@ -314,8 +294,13 @@ export default function CheckoutClient() {
     setSubmitting(true);
 
     try {
+      const normalizedPhone =
+        region === "uz"
+          ? formatUzPhone(getUzDigitsFromInput(phone))
+          : phone.trim();
+
       const cache: CustomerCache = {
-        phone: phone.trim(),
+        phone: normalizedPhone,
         name: name.trim(),
         address: address.trim(),
         comment: comment.trim(),
@@ -328,7 +313,7 @@ export default function CheckoutClient() {
         region,
         mode: mode === "oneclick" ? "oneclick" : "cart",
         customer: {
-          phone: phone.trim(),
+          phone: normalizedPhone,
           name: name.trim() || undefined,
           address: address.trim() || undefined,
           comment: comment.trim() || undefined,
@@ -337,14 +322,8 @@ export default function CheckoutClient() {
           id: it.productId,
           collection: it.collectionSlug || undefined,
           collectionLabel: it.collectionLabel || undefined,
-
-          // ✅ важно: сохраняем composite id + красивый title
           variantId: it.variantId,
           variantTitle: it.variantTitle || undefined,
-
-          // ✅ добавим image (потом можно отправлять фото в TG)
-          image: it.image || undefined,
-
           qty: it.qty,
           unit: it.unit,
           sum: it.sum,
@@ -448,13 +427,47 @@ export default function CheckoutClient() {
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <label className="block">
               <div className="text-xs text-black/50">Телефон *</div>
+
               <input
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+
+                  if (region !== "uz") {
+                    setPhone(v);
+                    return;
+                  }
+
+                  const digits = getUzDigitsFromInput(v);
+                  setPhone(formatUzPhone(digits));
+                }}
+                onFocus={() => {
+                  if (region === "uz") {
+                    setPhone((prev) =>
+                      formatUzPhone(getUzDigitsFromInput(prev)),
+                    );
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (region !== "uz") return;
+
+                  const input = e.currentTarget;
+                  const start = input.selectionStart ?? 0;
+                  const end = input.selectionEnd ?? 0;
+
+                  if (
+                    (e.key === "Backspace" || e.key === "Delete") &&
+                    start <= UZ_PREFIX.length &&
+                    end <= UZ_PREFIX.length
+                  ) {
+                    e.preventDefault();
+                  }
+                }}
                 className="mt-1 w-full rounded-2xl border border-black/10 bg-white px-4 py-3 text-sm outline-none focus:border-black/25"
                 placeholder={
-                  region === "uz" ? "+998 90 123 45 67" : "+7 999 123 45 67"
+                  region === "uz" ? "+998 91 123 45 67" : "+7 999 123 45 67"
                 }
+                inputMode="tel"
               />
             </label>
 
