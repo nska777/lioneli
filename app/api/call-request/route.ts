@@ -12,6 +12,20 @@ export async function POST(req: Request) {
       );
     }
 
+    const token = process.env.TELEGRAM_REQUESTS_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_REQUESTS_CHAT_ID;
+
+
+    if (!token || !chatId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Missing TELEGRAM_REQUESTS_BOT_TOKEN or TELEGRAM_REQUESTS_CHAT_ID",
+        },
+        { status: 500 }
+      );
+    }
+
     const text = `
 📞 *Заявка на звонок*
 —————————————
@@ -21,22 +35,23 @@ export async function POST(req: Request) {
 🕒 *Время:* ${new Date().toLocaleString("ru-RU")}
     `.trim();
 
-    const url = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`;
+    // ✅ ВАЖНО: токен НЕ вставляем как текст в ${...}
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
 
     const tgRes = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        chat_id: process.env.TELEGRAM_CHAT_ID,
+        chat_id: chatId, // ✅ Requests
         text,
         parse_mode: "Markdown",
       }),
     });
 
     if (!tgRes.ok) {
-      const err = await tgRes.text();
+      const err = await tgRes.text().catch(() => "");
       console.error("Telegram error:", err);
-      return NextResponse.json({ ok: false }, { status: 500 });
+      return NextResponse.json({ ok: false, error: err }, { status: 500 });
     }
 
     return NextResponse.json({ ok: true });

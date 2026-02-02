@@ -7,12 +7,14 @@ function esc(s: string) {
 }
 
 export async function POST(req: Request) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
+  const token = process.env.TELEGRAM_ORDERS_BOT_TOKEN;
+const chatId = process.env.TELEGRAM_ORDERS_CHAT_ID;
+
+
 
   if (!token || !chatId) {
     return NextResponse.json(
-      { ok: false, error: "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID" },
+      { ok: false, error: "Missing TELEGRAM_ORDERS_BOT_TOKEN or TELEGRAM_ORDERS_CHAT_ID" },
       { status: 500 },
     );
   }
